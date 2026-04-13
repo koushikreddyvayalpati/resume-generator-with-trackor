@@ -142,14 +142,15 @@
             <div class="modal-body">
                 <label for="outputDirInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Output Directory</label>
                 <div class="dir-input-row">
-                    <input type="text" id="outputDirInput" class="settings-input" placeholder="/path/to/save/files" />
-                    <button id="browseBtn" class="btn btn-secondary" style="white-space: nowrap;">📁 Browse</button>
+                    <input type="text" id="outputDirInput" class="settings-input" placeholder="/Users/yourname/Documents/resumes" />
+                    <button id="copyPathBtn" class="btn btn-secondary" style="white-space: nowrap; display: none;" id="copyPathBtn" title="Copy current directory path">📋 Copy</button>
                 </div>
                 <input type="file" id="dirPickerInput" webkitdirectory mozdirectory style="display: none;" />
-                <p class="hint" style="margin-top: 8px; font-size: 0.85rem; color: #6b7280;">
-                    <strong>📌 How to use:</strong><br>
-                    1. Click "Browse" to select a folder, OR<br>
-                    2. Paste the full path (e.g., /Users/yourname/Documents/resumes)<br>
+                <p class="hint" style="margin-top: 12px; font-size: 0.85rem; color: #6b7280; line-height: 1.6;">
+                    <strong>✅ How to set the path:</strong><br>
+                    <strong>Option 1 (Recommended):</strong> Open Finder/Explorer, navigate to desired folder, and drag-drop into the input field above<br>
+                    <strong>Option 2:</strong> Manually type the full absolute path (e.g., <code style="background: #f3f4f6; padding: 2px 4px; border-radius: 3px;">/Users/yourname/Documents</code>)<br>
+                    <strong>Important:</strong> Must be an absolute path, not relative!<br>
                     Resumes will be saved as subfolders inside this directory.
                 </p>
             </div>

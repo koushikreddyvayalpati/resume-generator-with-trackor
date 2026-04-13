@@ -55,3 +55,19 @@ htmlcov/
 output/
 outputs/
 resumes/
+tharun-resume/
+generated-resumes/
+
+# Logs and temp files
+app.log
+app_output.log
+*.log
+
+# Wrangler
+.wrangler/
+
+# Cleanup files
+CLEANUP_SUMMARY.md
+
+# Backup files
+*.backup

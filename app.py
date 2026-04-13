@@ -209,6 +209,27 @@ def update_settings():
                 "error": "Output directory cannot be empty"
             }), 400
 
+        # Check if path is absolute (Unix/macOS or Windows)
+        if not (output_directory.startswith('/') or (len(output_directory) > 2 and output_directory[1:3] == ':\\')):
+            return jsonify({
+                "success": False,
+                "error": "Path must be absolute (start with / or C:)\nExample: /Users/yourname/Documents/resumes"
+            }), 400
+
+        # Try to create the directory if it doesn't exist
+        try:
+            Path(output_directory).mkdir(parents=True, exist_ok=True)
+        except PermissionError:
+            return jsonify({
+                "success": False,
+                "error": f"Permission denied: Cannot write to {output_directory}"
+            }), 403
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": f"Cannot create directory: {str(e)}"
+            }), 400
+
         # Update in-memory settings and save to file
         settings["output_directory"] = output_directory
         save_settings(settings)

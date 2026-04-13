@@ -533,16 +533,22 @@ html, body {
 .settings-input {
     flex: 1;
     padding: 10px;
-    border: 1px solid var(--gray-300);
+    border: 2px dashed var(--gray-300);
     border-radius: 6px;
     font-size: 0.9rem;
     font-family: 'Monaco', 'Courier New', monospace;
+    transition: all 0.2s ease;
 }
 
 .settings-input:focus {
     outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.settings-input:hover {
+    border-color: var(--primary);
+    background-color: #f9fafb;
 }
 
 .hint {

@@ -61,6 +61,29 @@ class ResumeGenerator {
         this.browseBtn.addEventListener("click", () => this.browseDirectory());
         this.dirPickerInput.addEventListener("change", (e) => this.handleDirectorySelection(e));
 
+        // Drag and drop support for directory input
+        this.outputDirInput.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.outputDirInput.style.borderColor = "var(--primary)";
+            this.outputDirInput.style.backgroundColor = "#f0f7ff";
+        });
+
+        this.outputDirInput.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.outputDirInput.style.borderColor = "var(--gray-300)";
+            this.outputDirInput.style.backgroundColor = "white";
+        });
+
+        this.outputDirInput.addEventListener("drop", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.outputDirInput.style.borderColor = "var(--gray-300)";
+            this.outputDirInput.style.backgroundColor = "white";
+            this.handleDirectoryDrop(e);
+        });
+
         this.statusPath = null;
         this.pdfPath = null;
         this.statusCheckInterval = null;
@@ -302,25 +325,8 @@ class ResumeGenerator {
         }
     }
 
-    async browseDirectory() {
-        // Try modern File System Access API first (Chrome, Edge)
-        if (window.showDirectoryPicker) {
-            try {
-                const dirHandle = await window.showDirectoryPicker();
-                // The directory name is available, show it as feedback
-                this.outputDirInput.value = dirHandle.name || "/selected-directory";
-                console.log("Selected directory:", dirHandle.name);
-                return;
-            } catch (err) {
-                if (err.name !== "AbortError") {
-                    console.warn("File System Access API error:", err);
-                }
-                // Fall back to webkitdirectory if user cancels
-            }
-        }
-
-        // Fallback to webkitdirectory for older browsers
-        this.dirPickerInput.click();
+    browseDirectory() {
+        alert("📌 To set the path:\n\n1. Open Finder (Mac) or Explorer (Windows/Linux)\n2. Drag & drop your desired folder into the path field above\n3. OR manually type the full absolute path\n\nExample: /Users/yourname/Documents/resumes");
     }
 
     handleDirectorySelection(event) {
@@ -336,16 +342,48 @@ class ResumeGenerator {
         const pathParts = firstFilePath.split('/');
 
         if (pathParts.length > 0) {
-            // Use the root directory name as displayed feedback
             const dirName = pathParts[0];
-            this.outputDirInput.value = dirName;
-            console.log("Selected directory:", dirName, `(containing ${files.length} files)`);
+            // Show alert with the directory name found
+            alert(`Found directory: "${dirName}"\n\nPlease enter the FULL absolute path to this directory.\n\nExample: /Users/yourname/Documents/${dirName}`);
+            console.log("Selected directory name:", dirName, `(containing ${files.length} files)`);
         } else {
             alert("Please select a directory, not a file");
         }
 
         // Reset the file input so the same directory can be selected again
         this.dirPickerInput.value = "";
+    }
+
+    handleDirectoryDrop(event) {
+        const items = event.dataTransfer.items;
+
+        if (!items || items.length === 0) {
+            return;
+        }
+
+        // Get the first dropped item
+        const item = items[0];
+
+        if (item.kind === "file") {
+            const entry = item.webkitGetAsEntry();
+
+            if (entry && entry.isDirectory) {
+                // Try to get the full path from the directory entry
+                const fullPath = entry.fullPath;
+
+                if (fullPath && fullPath !== "/") {
+                    this.outputDirInput.value = fullPath;
+                    console.log("Dropped directory path:", fullPath);
+                } else {
+                    // Fallback to just showing the name
+                    const dirName = entry.name;
+                    alert(`Dropped directory: "${dirName}"\n\nPlease enter the FULL absolute path to this directory.\n\nExample: /Users/yourname/Documents/${dirName}`);
+                    this.outputDirInput.value = dirName;
+                }
+            } else {
+                alert("Please drop a folder, not a file");
+            }
+        }
     }
 
     showValidationStatus(valid, errors, warnings) {
