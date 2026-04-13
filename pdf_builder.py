@@ -42,13 +42,19 @@ def get_soffice_path():
 
     # Check if any path exists
     for path in paths_to_try:
-        if os.path.exists(path):
-            return path
+        try:
+            if os.path.exists(path):
+                return path
+        except Exception:
+            continue
 
     # Fall back to searching in PATH
-    soffice = shutil.which("soffice")
-    if soffice:
-        return soffice
+    try:
+        soffice = shutil.which("soffice")
+        if soffice:
+            return soffice
+    except Exception:
+        pass
 
     return None
 
