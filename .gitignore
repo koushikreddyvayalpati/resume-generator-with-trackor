@@ -50,13 +50,13 @@ htmlcov/
 # Streamlit (if used)
 .streamlit/
 
-# Output files (exclude generated resumes, but track config)
+# Output files (exclude generated resumes, but track template)
 # Individual generated folders can be ignored
 output/
 outputs/
-resumes/
 tharun-resume/
 generated-resumes/
+# Note: resumes/ IS tracked for template file, but not for generated ones
 
 # Logs and temp files
 app.log
