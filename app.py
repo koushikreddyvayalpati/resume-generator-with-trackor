@@ -210,10 +210,14 @@ def update_settings():
             }), 400
 
         # Check if path is absolute (Unix/macOS or Windows)
-        if not (output_directory.startswith('/') or (len(output_directory) > 2 and output_directory[1:3] == ':\\')):
+        is_absolute = (output_directory.startswith('/') or
+                      (len(output_directory) > 2 and output_directory[1:3] == ':\\') or
+                      (len(output_directory) > 2 and output_directory[1] == ':'))
+
+        if not is_absolute:
             return jsonify({
                 "success": False,
-                "error": "Path must be absolute (start with / or C:)\nExample: /Users/yourname/Documents/resumes"
+                "error": "Path must be absolute.\nExamples:\n- Mac/Linux: /Users/yourname/Documents/resumes\n- Windows: C:\\Users\\yourname\\Documents\\resumes"
             }), 400
 
         # Try to create the directory if it doesn't exist

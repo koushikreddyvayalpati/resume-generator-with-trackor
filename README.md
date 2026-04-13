@@ -19,7 +19,17 @@ A modern, Flask-based resume generator with real-time preview, PDF export, and c
 ./setup.sh
 ```
 
+### Windows (Batch)
+```cmd
+setup.bat
+```
+
 ### Windows (PowerShell)
+```powershell
+.\setup.ps1
+```
+
+Or manually:
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
@@ -27,7 +37,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-That's it! The script will:
+The script will:
 1. ✅ Check for Python 3
 2. ✅ Create a virtual environment
 3. ✅ Install all dependencies
@@ -36,9 +46,12 @@ That's it! The script will:
 
 ## 📋 Requirements
 
-- Python 3.8+
-- Flask 2.0+
-- LibreOffice (for PDF conversion)
+- **Python 3.8+** — Download from https://www.python.org
+- **Flask 2.0+** — Installed automatically
+- **LibreOffice** (for PDF conversion)
+  - macOS: `brew install libreoffice`
+  - Windows: Download from https://www.libreoffice.org/download
+  - Linux: `apt-get install libreoffice` or `yum install libreoffice`
 
 ## 🎯 How to Use
 
@@ -119,20 +132,44 @@ Your work history is automatically included:
 
 ## 🛠️ Troubleshooting
 
+### All Platforms
+
 **Port already in use:**
 ```bash
+# macOS / Linux
 FLASK_PORT=5002 python3 app.py
+
+# Windows (Command Prompt)
+set FLASK_PORT=5002 && python app.py
 ```
 
 **PDF conversion not working:**
-- Install LibreOffice: `brew install libreoffice` (macOS)
-- Or: `apt-get install libreoffice` (Linux)
+- Install LibreOffice from https://www.libreoffice.org/download
+- Make sure it's in your system PATH
+- Restart the app after installation
+
+### Windows-Specific
+
+**setup.bat won't run:**
+- Right-click `setup.bat` → Run as Administrator
+- Or use PowerShell: `.\setup.ps1`
+
+**PowerShell execution policy error:**
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\setup.ps1
+```
 
 **Virtual environment issues:**
-```bash
-rm -rf venv
-./setup.sh
+```cmd
+rmdir /s venv
+setup.bat
 ```
+
+**Python not found:**
+- Ensure Python is installed and added to PATH
+- Run `python --version` to verify
+- Restart your terminal/command prompt
 
 ## 📝 License
 
