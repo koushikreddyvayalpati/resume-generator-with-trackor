@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Compact Header -->
+        <header class="app-header">
+            <h1>📄 Resume Generator</h1>
+            <div class="header-actions">
+                <button id="instructionsBtn" class="btn-icon" title="Format Guide">?</button>
+                <button id="settingsBtn" class="btn-icon" title="Settings">⚙</button>
+                <span id="conversionStatus" class="badge">
+                    {% if pdf_conversion_ready %}
+                    ✓ Ready
+                    {% else %}
+                    ✗ Error
+                    {% endif %}
+                </span>
+            </div>
+        </header>
+
+        <!-- Main Layout: Input on Left, Output on Right -->
+        <div class="app-content">
+            <!-- LEFT COLUMN: Input + Preview -->
+            <div class="left-column">
+                <!-- Input Section -->
+                <div class="input-panel">
+                    <textarea
+                        id="contentInput"
+                        class="resume-input"
+                        placeholder="Paste resume content here..."
+                        spellcheck="false"
+                    ></textarea>
+
+                    <div class="input-controls">
+                        <span class="char-count"><span id="charCount">0</span> chars</span>
+                        <input
+                            type="text"
+                            id="folderName"
+                            class="folder-input"
+                            placeholder="Folder name (optional)"
+                        >
+                        <button id="generateBtn" class="btn btn-primary" disabled>
+                            Generate
+                        </button>
+                    </div>
+
+                    <!-- Validation Status -->
+                    <div id="validationDisplay" class="validation-info" style="display: none;">
+                        <div id="validationStatus" class="status-badge"></div>
+                        <div id="errorsList" class="error-list"></div>
+                    </div>
+                </div>
+
+                <!-- Preview Panel -->
+                <div class="preview-panel">
+                    <h3>Preview</h3>
+                    <div id="previewContainer" class="preview-content"></div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Output -->
+            <div class="right-column">
+                <!-- Initial State -->
+                <div id="initialState" class="output-panel" style="display: flex; align-items: center; justify-content: center; color: #999;">
+                    Paste content and click Generate
+                </div>
+
+                <!-- Loading State -->
+                <div id="loadingState" class="output-panel" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Generating resume...</p>
+                </div>
+
+                <!-- Success State -->
+                <div id="successState" class="output-panel" style="display: none;">
+                    <div id="previewSection" style="display: none;">
+                        <div class="preview-header">
+                            <span>PDF Preview</span>
+                            <span id="statusPDF">⏳ Converting...</span>
+                        </div>
+                        <iframe id="pdfPreview" frameborder="0"></iframe>
+                    </div>
+
+                    <div id="downloadSection" style="display: none;">
+                        <button id="downloadBtn" class="btn btn-success">📥 Download</button>
+                        <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
+                    </div>
+                </div>
+
+                <!-- Error State -->
+                <div id="errorState" class="output-panel error" style="display: none;">
+                    <p id="errorMessage"></p>
+                    <button id="retryBtn" class="btn btn-secondary">Try Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instructions Modal -->
+    <div id="instructionsModal" class="modal" style="display: none;">
+        <div class="modal-overlay" id="modalOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Format Guide</h2>
+                <button id="closeModal" class="btn-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="guide-item">
+                    <strong>UPDATED TITLE</strong><br>
+                    Your job title
+                </div>
+                <div class="guide-item">
+                    <strong>UPDATED SUMMARY</strong><br>
+                    Brief overview
+                </div>
+                <div class="guide-item">
+                    <strong>UPDATED SKILLS</strong><br>
+                    Format: <code>Category: items</code>
+                </div>
+                <div class="guide-item">
+                    <strong>PROFESSIONAL EXPERIENCE</strong><br>
+                    Company name, job title, then bullet points
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal" style="display: none;">
+        <div class="modal-overlay" id="settingsModalOverlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button id="settingsClose" class="btn-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <label for="outputDirInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Output Directory</label>
+                <div class="dir-input-row">
+                    <input type="text" id="outputDirInput" class="settings-input" placeholder="/path/to/save/files" />
+                    <button id="browseBtn" class="btn btn-secondary" style="white-space: nowrap;">📁 Browse</button>
+                </div>
+                <input type="file" id="dirPickerInput" webkitdirectory mozdirectory style="display: none;" />
+                <p class="hint" style="margin-top: 8px; font-size: 0.85rem; color: #6b7280;">
+                    <strong>📌 How to use:</strong><br>
+                    1. Click "Browse" to select a folder, OR<br>
+                    2. Paste the full path (e.g., /Users/yourname/Documents/resumes)<br>
+                    Resumes will be saved as subfolders inside this directory.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button id="settingsCancel" class="btn btn-secondary">Cancel</button>
+                <button id="settingsSave" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
