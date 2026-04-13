@@ -14,7 +14,9 @@ from docx.oxml.ns import qn
 load_dotenv()
 
 # Configuration - use environment variables with fallback defaults
-TEMPLATE_PATH = os.getenv("RESUME_TEMPLATE_PATH", "/Users/tharun/Downloads/Tharun Manikonda Resume.docx")
+# Default to local resumes folder in project directory
+DEFAULT_TEMPLATE = os.path.join(os.path.dirname(__file__), 'resumes', 'Tharun Manikonda Resume.docx')
+TEMPLATE_PATH = os.getenv("RESUME_TEMPLATE_PATH", DEFAULT_TEMPLATE)
 BULLET = "●"
 TEXT_W = 7.884   # usable width (A4 8.278" − 2 × 0.197")
 
