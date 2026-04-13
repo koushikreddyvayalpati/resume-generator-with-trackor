@@ -27,7 +27,9 @@ load_dotenv()
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 BASE_RESUME_PATH = "config/base_resume.json"
-OUTPUT_ROOT = os.getenv("OUTPUT_ROOT", "/tmp/tharun-resume")  # Use /tmp to avoid macOS permission dialogs
+# Default to local resumes folder in project directory
+DEFAULT_OUTPUT_ROOT = os.path.join(os.path.dirname(__file__), 'resumes')
+OUTPUT_ROOT = os.getenv("OUTPUT_ROOT", DEFAULT_OUTPUT_ROOT)
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'config', 'settings.json')
 
 def load_settings():

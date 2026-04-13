@@ -42,8 +42,12 @@ Write-Host "+ All dependencies installed" -ForegroundColor Green
 # Check for .env file
 if (-not (Test-Path ".env")) {
     Write-Host "04 Creating .env file..." -ForegroundColor Yellow
-    $defaultPath = "$env:USERPROFILE\Documents\tharun-resume"
-    "OUTPUT_ROOT=$defaultPath" | Out-File -FilePath ".env" -Encoding UTF8
+    $envContent = @"
+ANTHROPIC_API_KEY=your_api_key_here
+RESUME_TEMPLATE_PATH=resumes/Tharun Manikonda Resume.docx
+OUTPUT_ROOT=resumes
+"@
+    $envContent | Out-File -FilePath ".env" -Encoding UTF8
     Write-Host "+ .env file created" -ForegroundColor Green
 }
 

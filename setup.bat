@@ -46,7 +46,9 @@ REM Check for .env file
 if not exist ".env" (
     echo 04 Creating .env file...
     (
-        echo OUTPUT_ROOT=C:\Users\%USERNAME%\Documents\tharun-resume
+        echo ANTHROPIC_API_KEY=your_api_key_here
+        echo RESUME_TEMPLATE_PATH=resumes/Tharun Manikonda Resume.docx
+        echo OUTPUT_ROOT=resumes
     ) > .env
     echo + .env file created
 )

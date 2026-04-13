@@ -44,7 +44,11 @@ echo "✅ All dependencies installed"
 # Check for .env file
 if [ ! -f ".env" ]; then
     echo "📋 Creating .env file from template..."
-    cp .env.example .env 2>/dev/null || echo "OUTPUT_ROOT=/tmp/tharun-resume" > .env
+    cp .env.example .env 2>/dev/null || cat > .env << EOF
+ANTHROPIC_API_KEY=your_api_key_here
+RESUME_TEMPLATE_PATH=resumes/Tharun Manikonda Resume.docx
+OUTPUT_ROOT=resumes
+EOF
     echo "✅ .env file created"
 fi
 
