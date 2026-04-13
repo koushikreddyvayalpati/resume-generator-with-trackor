@@ -1,6 +1,8 @@
 import re
 import subprocess
 import os
+import platform
+import shutil
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -12,6 +14,43 @@ from docx.oxml.ns import qn
 
 # Load environment variables from .env file
 load_dotenv()
+
+
+def get_soffice_path():
+    """Get LibreOffice soffice command path for current OS."""
+    system = platform.system()
+
+    # Try common paths for each OS
+    paths_to_try = []
+
+    if system == "Darwin":  # macOS
+        paths_to_try = [
+            "/opt/homebrew/bin/soffice",
+            "/usr/local/bin/soffice",
+            "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+        ]
+    elif system == "Windows":
+        paths_to_try = [
+            "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+            "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
+        ]
+    elif system == "Linux":
+        paths_to_try = [
+            "/usr/bin/soffice",
+            "/usr/local/bin/soffice",
+        ]
+
+    # Check if any path exists
+    for path in paths_to_try:
+        if os.path.exists(path):
+            return path
+
+    # Fall back to searching in PATH
+    soffice = shutil.which("soffice")
+    if soffice:
+        return soffice
+
+    return None
 
 # Configuration - use environment variables with fallback defaults
 # Default to local resumes folder in project directory
@@ -268,19 +307,21 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
 
 def is_pdf_conversion_ready() -> tuple[bool, str]:
     """Check if PDF conversion tools are available (LibreOffice)."""
-    # Check if LibreOffice soffice command is available
+    soffice_path = get_soffice_path()
+
+    if not soffice_path:
+        return False, "LibreOffice not installed"
+
     try:
         result = subprocess.run(
-            ["/opt/homebrew/bin/soffice", "--version"],
+            [soffice_path, "--version"],
             capture_output=True,
             text=True,
-            timeout=15  # LibreOffice can be slow on first run
+            timeout=15
         )
         if result.returncode == 0:
             return True, f"LibreOffice ready ({result.stdout.strip()})"
         return False, "LibreOffice not responding"
-    except FileNotFoundError:
-        return False, "LibreOffice not installed"
     except subprocess.TimeoutExpired:
         return False, "LibreOffice version check timed out"
     except Exception as e:
@@ -289,23 +330,26 @@ def is_pdf_conversion_ready() -> tuple[bool, str]:
 
 def _convert_docx_to_pdf_via_libreoffice(docx_path: str, output_path: str, timeout_seconds: int = 120) -> None:
     """Convert DOCX to PDF using LibreOffice command-line."""
-    import subprocess
-
     try:
+        # Get LibreOffice path for this OS
+        soffice_path = get_soffice_path()
+        if not soffice_path:
+            raise RuntimeError("LibreOffice not found. Please install LibreOffice to convert DOCX to PDF.")
+
         # Get output directory and filename
         output_dir = os.path.dirname(output_path)
         output_filename = os.path.basename(output_path)
 
         # Use LibreOffice headless mode to convert
         cmd = [
-            "/opt/homebrew/bin/soffice",
+            soffice_path,
             "--headless",
             "--convert-to", "pdf",
             "--outdir", output_dir,
             docx_path
         ]
 
-        print(f"  Running: {' '.join(cmd)}")
+        print(f"  Running LibreOffice conversion...")
         result = subprocess.run(
             cmd,
             capture_output=True,
