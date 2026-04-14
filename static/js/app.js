@@ -41,6 +41,10 @@ class ResumeGenerator {
         this.browseBtn = document.getElementById("browseBtn");
         this.dirPickerInput = document.getElementById("dirPickerInput");
 
+        // Base resume for local parsing
+        this.baseResume = null;
+        this.loadBaseResume();
+
         // Event listeners
         this.contentInput.addEventListener("input", () => this.onContentChange());
         this.contentInput.addEventListener("keydown", (e) => this.handleContentKeydown(e));
@@ -92,6 +96,16 @@ class ResumeGenerator {
 
         // Initial state
         this.showState("initial");
+    }
+
+    async loadBaseResume() {
+        try {
+            const response = await fetch("/config/base_resume.json");
+            this.baseResume = await response.json();
+        } catch (error) {
+            console.error("Failed to load base resume:", error);
+            this.baseResume = {};
+        }
     }
 
     // Auto-validate and preview with debounce
@@ -168,27 +182,12 @@ class ResumeGenerator {
     }
 
     async loadPreview(content) {
-        try {
-            const response = await fetch("/api/preview", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ content }),
-            });
-
-            const data = await response.json();
-            console.log("Preview response:", data);
-
-            if (data.success) {
-                this.displayPreview(data.preview);
-                // Also show validation errors if any
-                if (data.errors && data.errors.length > 0) {
-                    this.showValidationStatus(false, data.errors, []);
-                }
-            } else {
-                console.error("Preview error:", data.error);
-            }
-        } catch (error) {
-            console.error("Preview fetch error:", error);
+        if (!this.baseResume) return;
+        const preview = parseUpdatedContentToResume(content, this.baseResume);
+        const validation = validateUpdatedContent(content);
+        this.displayPreview(preview);
+        if (validation.errors.length > 0) {
+            this.showValidationStatus(false, validation.errors, validation.warnings);
         }
     }
 

@@ -337,6 +337,15 @@ def status():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/config/base_resume.json", methods=["GET"])
+def get_base_resume():
+    """Serve base resume JSON for frontend parsing."""
+    return send_file(
+        BASE_RESUME_PATH,
+        mimetype="application/json"
+    )
+
+
 @app.route("/api/download", methods=["GET"])
 def download():
     """Download PDF file."""
