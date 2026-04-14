@@ -33,6 +33,8 @@ def get_soffice_path():
         paths_to_try = [
             "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
             "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
+            "C:\\Program Files\\LibreOffice\\program",
+            "C:\\Program Files (x86)\\LibreOffice\\program",
         ]
     elif system == "Linux":
         paths_to_try = [
@@ -337,14 +339,31 @@ def is_pdf_conversion_ready() -> tuple[bool, str]:
 def _convert_docx_to_pdf_via_libreoffice(docx_path: str, output_path: str, timeout_seconds: int = 120) -> None:
     """Convert DOCX to PDF using LibreOffice command-line."""
     try:
+        print(f"  [PDF] Starting conversion: {docx_path}")
+
         # Get LibreOffice path for this OS
         soffice_path = get_soffice_path()
+        print(f"  [PDF] Detected LibreOffice path: {soffice_path}")
+
         if not soffice_path:
-            raise RuntimeError("LibreOffice not found. Please install LibreOffice to convert DOCX to PDF.")
+            raise RuntimeError("LibreOffice not found. Checked paths: C:\\Program Files\\LibreOffice\\program\\soffice.exe, C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe")
+
+        # Verify DOCX file exists
+        if not os.path.exists(docx_path):
+            raise RuntimeError(f"DOCX file not found: {docx_path}")
+        print(f"  [PDF] DOCX file verified: {docx_path}")
 
         # Get output directory and filename
         output_dir = os.path.dirname(output_path)
         output_filename = os.path.basename(output_path)
+
+        print(f"  [PDF] Output directory: {output_dir}")
+        print(f"  [PDF] Output filename: {output_filename}")
+
+        # Verify output directory exists
+        if not os.path.exists(output_dir):
+            raise RuntimeError(f"Output directory does not exist: {output_dir}")
+        print(f"  [PDF] Output directory verified")
 
         # Use LibreOffice headless mode to convert
         cmd = [
@@ -355,27 +374,37 @@ def _convert_docx_to_pdf_via_libreoffice(docx_path: str, output_path: str, timeo
             docx_path
         ]
 
-        print(f"  Running LibreOffice conversion...")
+        print(f"  [PDF] Running command: {' '.join(cmd)}")
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=timeout_seconds
+            timeout=timeout_seconds,
+            env=os.environ.copy()
         )
 
+        print(f"  [PDF] Command return code: {result.returncode}")
+        if result.stdout:
+            print(f"  [PDF] STDOUT: {result.stdout}")
+        if result.stderr:
+            print(f"  [PDF] STDERR: {result.stderr}")
+
         if result.returncode != 0:
-            raise RuntimeError(f"LibreOffice conversion failed: {result.stderr}")
+            raise RuntimeError(f"LibreOffice command failed with code {result.returncode}. STDERR: {result.stderr}")
 
         # LibreOffice creates PDF with same name as DOCX but .pdf extension
-        # So we need to verify it exists
         expected_pdf = os.path.join(output_dir, os.path.basename(docx_path).replace('.docx', '.pdf'))
+        print(f"  [PDF] Checking for PDF at: {expected_pdf}")
+
         if not os.path.exists(expected_pdf):
-            raise RuntimeError(f"PDF not created at expected location: {expected_pdf}")
+            # List files in output directory for debugging
+            files_in_dir = os.listdir(output_dir)
+            raise RuntimeError(f"PDF not created at {expected_pdf}. Files in directory: {files_in_dir}")
 
-        print(f"  ✓ PDF created successfully at: {expected_pdf}")
+        print(f"  [PDF] ✓ PDF created successfully: {expected_pdf}")
 
-    except subprocess.TimeoutExpired:
-        raise RuntimeError(f"LibreOffice conversion timed out after {timeout_seconds} seconds")
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError(f"LibreOffice conversion timed out after {timeout_seconds} seconds. Error: {str(e)}")
     except Exception as e:
         raise RuntimeError(f"LibreOffice PDF conversion failed: {str(e)}")
 

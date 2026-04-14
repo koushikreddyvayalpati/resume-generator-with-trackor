@@ -26,6 +26,12 @@ def main() -> None:
     status_path = Path(args.status)
     start = time.time()
 
+    print(f"[PDF Job] Starting PDF conversion job")
+    print(f"[PDF Job] DOCX: {docx_path}")
+    print(f"[PDF Job] PDF output: {pdf_path}")
+    print(f"[PDF Job] Status file: {status_path}")
+    print(f"[PDF Job] Timeout: {args.timeout}s")
+
     write_status(
         status_path,
         {
@@ -37,7 +43,9 @@ def main() -> None:
     )
 
     try:
+        print(f"[PDF Job] Calling convert_docx_to_pdf_via_libreoffice...")
         convert_docx_to_pdf_via_libreoffice(str(docx_path), str(pdf_path), timeout_seconds=args.timeout)
+        print(f"[PDF Job] Conversion completed successfully")
 
         # Check if PDF was actually created
         if Path(pdf_path).exists():
