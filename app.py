@@ -24,7 +24,7 @@ load_dotenv()
 
 
 # Configuration
-app = Flask(__name__)
+app = Flask(__name__, url_prefix='/resume')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 BASE_RESUME_PATH = "config/base_resume.json"
 # Default to local resumes folder in project directory
