@@ -454,14 +454,32 @@ class ResumeGenerator {
 
     startStatusPolling() {
         let pollCount = 0;
-        const maxPolls = 120; // 24 seconds max (200ms interval)
+        const maxPolls = 150;
+        const startTime = Date.now();
 
-        // Show progress indicator
+        // Show proper loading UI
+        const previewSection = document.getElementById("previewSection");
         const statusPDF = document.getElementById("statusPDF");
-        if (statusPDF) statusPDF.innerHTML = '<span class="spinner"></span> Converting...';
+
+        if (previewSection) previewSection.style.display = "block";
+        if (statusPDF) {
+            statusPDF.innerHTML = '<span class="spinner"></span> Generating PDF... Please wait';
+        }
+
+        const pdfPreview = document.getElementById("pdfPreview");
+        if (pdfPreview) {
+            pdfPreview.src = "";
+            pdfPreview.style.display = "none";
+        }
 
         this.statusCheckInterval = setInterval(async () => {
             pollCount++;
+            const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+
+            // Update elapsed time
+            if (statusPDF) {
+                statusPDF.innerHTML = `<span class="spinner"></span> Generating PDF... ${elapsedSec}s`;
+            }
 
             if (pollCount > maxPolls) {
                 clearInterval(this.statusCheckInterval);
@@ -478,14 +496,25 @@ class ResumeGenerator {
                 if (status.state === "success") {
                     clearInterval(this.statusCheckInterval);
                     this.pdfPath = status.pdf;
-                    document.getElementById("statusPDF").textContent = "✓ Ready";
-                    this.showDownloadOption();
+
+                    // Show loading message
+                    if (statusPDF) {
+                        statusPDF.innerHTML = '<span class="spinner"></span> Loading PDF...';
+                    }
+
+                    // Load the real PDF
                     this.loadPdfPreview();
+
+                    // After PDF loads, show ready
+                    setTimeout(() => {
+                        if (statusPDF) statusPDF.textContent = "✓ Ready";
+                        this.showDownloadOption();
+                    }, 500);
                 }
             } catch (error) {
                 console.error("Status check error:", error);
             }
-        }, 200); // Faster polling: 200ms instead of 500ms
+        }, 200);
     }
 
     loadPdfPreview() {
