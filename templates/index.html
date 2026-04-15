@@ -79,17 +79,17 @@
 
                 <!-- Success State -->
                 <div id="successState" class="output-panel" style="display: none;">
+                    <div id="downloadSection" style="display: none;">
+                        <button id="downloadBtn" class="btn btn-success">📥 Download</button>
+                        <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
+                    </div>
+
                     <div id="previewSection" style="display: none;">
                         <div class="preview-header">
                             <span>PDF Preview</span>
                             <span id="statusPDF">⏳ Converting...</span>
                         </div>
                         <iframe id="pdfPreview" frameborder="0"></iframe>
-                    </div>
-
-                    <div id="downloadSection" style="display: none;">
-                        <button id="downloadBtn" class="btn btn-success">📥 Download</button>
-                        <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
                     </div>
                 </div>
 
