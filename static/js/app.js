@@ -454,7 +454,11 @@ class ResumeGenerator {
 
     startStatusPolling() {
         let pollCount = 0;
-        const maxPolls = 60; // 30 seconds max (500ms interval)
+        const maxPolls = 120; // 24 seconds max (200ms interval)
+
+        // Show progress indicator
+        const statusPDF = document.getElementById("statusPDF");
+        if (statusPDF) statusPDF.innerHTML = '<span class="spinner"></span> Converting...';
 
         this.statusCheckInterval = setInterval(async () => {
             pollCount++;
@@ -481,7 +485,7 @@ class ResumeGenerator {
             } catch (error) {
                 console.error("Status check error:", error);
             }
-        }, 500);
+        }, 200); // Faster polling: 200ms instead of 500ms
     }
 
     loadPdfPreview() {

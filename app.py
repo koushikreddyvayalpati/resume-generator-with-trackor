@@ -145,53 +145,6 @@ def validate():
     })
 
 
-@app.route("/api/preview", methods=["POST"])
-def preview():
-    """Preview parsed resume content without generating files."""
-    try:
-        data = request.get_json()
-        content = data.get("content", "").strip()
-
-        if not content:
-            return jsonify({
-                "success": False,
-                "error": "No content provided"
-            }), 400
-
-        # Parse content (don't validate first - just try to parse)
-        base_resume = load_base_resume()
-        merged_resume = parse_updated_content_to_resume(content, base_resume)
-
-        # Also validate for errors to show
-        errors, warnings = validate_updated_content(content)
-
-        # Return parsed data for preview even if validation has errors
-        return jsonify({
-            "success": True,
-            "preview": {
-                "title": merged_resume.get("title", ""),
-                "summary": merged_resume.get("summary", ""),
-                "technical_skills": merged_resume.get("technical_skills", []),
-                "experience": [
-                    {
-                        "company": exp.get("company", ""),
-                        "location": exp.get("location", ""),
-                        "title": exp.get("title", ""),
-                        "dates": exp.get("dates", ""),
-                        "bullets": exp.get("bullets", [])
-                    }
-                    for exp in merged_resume.get("experience", [])
-                ]
-            },
-            "errors": errors
-        })
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-
 @app.route("/api/settings", methods=["GET"])
 def get_settings():
     """Get current settings."""
@@ -378,6 +331,15 @@ def health():
         "pdf_conversion_status": msg,
         "timestamp": datetime.now().isoformat()
     })
+
+
+@app.after_request
+def add_caching_headers(response):
+    """Add caching headers for performance."""
+    if response.content_type and ('text/css' in response.content_type or 'javascript' in response.content_type):
+        response.cache_control.max_age = 604800  # 1 week
+        response.cache_control.public = True
+    return response
 
 
 if __name__ == "__main__":
