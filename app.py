@@ -299,30 +299,13 @@ def get_base_resume():
     )
 
 
-@app.route("/api/preview-pdf", methods=["GET"])
-def preview_pdf():
-    """Preview PDF file inline (for iframe)."""
-    try:
-        pdf_path = request.args.get("path", "").strip()
-        if not pdf_path:
-            return jsonify({"error": "Missing 'path' parameter"}), 400
-
-        if not os.path.exists(pdf_path):
-            return jsonify({"error": "PDF not found"}), 404
-
-        return send_file(
-            pdf_path,
-            mimetype="application/pdf"
-        )
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 @app.route("/api/download", methods=["GET"])
 def download():
-    """Download PDF file."""
+    """Download or preview PDF file."""
     try:
         pdf_path = request.args.get("path", "").strip()
+        preview = request.args.get("preview", "").lower() == "true"
+
         if not pdf_path:
             return jsonify({"error": "Missing 'path' parameter"}), 400
 
@@ -332,8 +315,8 @@ def download():
         filename = os.path.basename(pdf_path)
         return send_file(
             pdf_path,
-            as_attachment=True,
-            download_name=filename,
+            as_attachment=not preview,
+            download_name=filename if not preview else None,
             mimetype="application/pdf"
         )
     except Exception as e:

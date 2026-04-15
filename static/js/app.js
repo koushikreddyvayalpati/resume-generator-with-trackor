@@ -521,30 +521,28 @@ class ResumeGenerator {
         const previewSection = document.getElementById("previewSection");
         const pdfPreview = document.getElementById("pdfPreview");
 
-        if (!this.pdfPath) return;
+        console.log("loadPdfPreview called, pdfPath:", this.pdfPath);
+        if (!this.pdfPath) {
+            console.log("No pdfPath, returning");
+            return;
+        }
 
-        // Fetch PDF as blob and create local URL for iframe
-        fetch(`/api/preview-pdf?path=${encodeURIComponent(this.pdfPath)}`)
-            .then((response) => {
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.blob();
-            })
-            .then((blob) => {
-                const url = URL.createObjectURL(blob);
-                pdfPreview.src = url;
-                previewSection.style.display = "block";
-            })
-            .catch((error) => {
-                console.error("Failed to load PDF preview:", error);
-                previewSection.style.display = "block";
-                pdfPreview.src = "about:blank";
-            });
+        const url = `/api/download?path=${encodeURIComponent(this.pdfPath)}&preview=true`;
+        console.log("Setting iframe src to:", url);
+        pdfPreview.src = url;
+        pdfPreview.style.display = "block";
+        previewSection.style.display = "block";
+        console.log("Preview section shown");
     }
 
     showDownloadOption() {
         const downloadSection = document.getElementById("downloadSection");
         const refreshSection = document.getElementById("refreshSection");
-        if (downloadSection) downloadSection.style.display = "block";
+        console.log("showDownloadOption called, downloadSection:", downloadSection);
+        if (downloadSection) {
+            downloadSection.style.display = "block";
+            console.log("Download section shown");
+        }
         if (refreshSection) refreshSection.style.display = "none";
     }
 
