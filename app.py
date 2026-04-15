@@ -336,6 +336,10 @@ def health():
 @app.after_request
 def add_caching_headers(response):
     """Add caching headers for performance."""
+    # Skip for file downloads and binary responses
+    if response.direct_passthrough or response.is_streamed:
+        return response
+
     if response.content_type and ('text/css' in response.content_type or 'javascript' in response.content_type):
         response.cache_control.max_age = 604800  # 1 week
         response.cache_control.public = True
