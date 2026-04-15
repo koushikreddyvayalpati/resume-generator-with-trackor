@@ -313,12 +313,16 @@ def download():
             return jsonify({"error": "PDF not found"}), 404
 
         filename = os.path.basename(pdf_path)
-        return send_file(
+        response = send_file(
             pdf_path,
             as_attachment=not preview,
             download_name=filename if not preview else None,
             mimetype="application/pdf"
         )
+        # Ensure proper headers for proxying
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
