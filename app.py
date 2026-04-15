@@ -316,12 +316,22 @@ def download():
         response = send_file(
             pdf_path,
             as_attachment=not preview,
-            download_name=filename if not preview else None,
-            mimetype="application/pdf"
+            download_name=filename,
+            mimetype="application/pdf",
+            conditional=True,
+            max_age=0,
         )
-        # Ensure proper headers for proxying
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+
+        if not preview:
+            response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        else:
+            response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+
+        response.headers["Content-Type"] = "application/pdf"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
