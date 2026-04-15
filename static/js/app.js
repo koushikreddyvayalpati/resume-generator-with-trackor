@@ -523,17 +523,21 @@ class ResumeGenerator {
 
         if (!this.pdfPath) return;
 
-        fetch(
-            `/api/download?path=${encodeURIComponent(this.pdfPath)}`
-        )
-            .then((response) => response.blob())
+        // Fetch PDF as blob and create local URL for iframe
+        fetch(`/api/preview-pdf?path=${encodeURIComponent(this.pdfPath)}`)
+            .then((response) => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.blob();
+            })
             .then((blob) => {
                 const url = URL.createObjectURL(blob);
                 pdfPreview.src = url;
                 previewSection.style.display = "block";
             })
             .catch((error) => {
-                console.warn("Failed to load PDF preview:", error);
+                console.error("Failed to load PDF preview:", error);
+                previewSection.style.display = "block";
+                pdfPreview.src = "about:blank";
             });
     }
 
