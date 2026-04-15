@@ -15,7 +15,7 @@ from pathlib import Path
 from datetime import datetime
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response
 from manual_resume_parser import parse_updated_content_to_resume, validate_updated_content
 from pdf_builder import build_resume_docx, is_pdf_conversion_ready
 
@@ -313,19 +313,54 @@ def download():
             return jsonify({"error": "PDF not found"}), 404
 
         filename = os.path.basename(pdf_path)
-        response = send_file(
-            pdf_path,
-            as_attachment=not preview,
-            download_name=filename,
-            mimetype="application/pdf",
-            conditional=True,
-            max_age=0,
-        )
+        file_size = os.path.getsize(pdf_path)
+        status = 200
+        headers = {}
+
+        range_header = request.headers.get("Range", "")
+        match = re.match(r"bytes=(\d*)-(\d*)$", range_header)
+
+        if match:
+            start_raw, end_raw = match.groups()
+
+            if start_raw == "" and end_raw == "":
+                return Response(status=416, headers={"Content-Range": f"bytes */{file_size}"})
+
+            if start_raw == "":
+                suffix_length = int(end_raw)
+                start = max(file_size - suffix_length, 0)
+                end = file_size - 1
+            else:
+                start = int(start_raw)
+                end = int(end_raw) if end_raw else file_size - 1
+                end = min(end, file_size - 1)
+
+            if start >= file_size or start > end:
+                return Response(status=416, headers={"Content-Range": f"bytes */{file_size}"})
+
+            length = end - start + 1
+            with open(pdf_path, "rb") as f:
+                f.seek(start)
+                data = f.read(length)
+
+            status = 206
+            headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+        else:
+            with open(pdf_path, "rb") as f:
+                data = f.read()
+            length = file_size
+
+        response = Response(data, status=status, mimetype="application/pdf")
+        response.headers["Content-Length"] = str(length)
+        response.headers["Accept-Ranges"] = "bytes"
 
         if not preview:
             response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
         else:
             response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+
+        for key, value in headers.items():
+            response.headers[key] = value
 
         response.headers["Content-Type"] = "application/pdf"
         response.headers["X-Content-Type-Options"] = "nosniff"
