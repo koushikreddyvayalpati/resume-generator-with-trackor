@@ -202,11 +202,46 @@ html, body {
     min-height: 0;
 }
 
+.preview-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
 .preview-panel h3 {
     font-size: 1rem;
     font-weight: 700;
     color: var(--gray-900);
+}
+
+.inline-status {
+    min-height: 16px;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    white-space: nowrap;
+}
+
+.contact-editor {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
     margin-bottom: 12px;
+}
+
+.contact-input {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.contact-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .preview-content {
@@ -231,6 +266,12 @@ html, body {
     font-weight: 700;
     color: var(--gray-900);
     margin-bottom: 6px;
+}
+
+.preview-contact {
+    color: var(--gray-600);
+    font-size: 0.9rem;
+    margin-bottom: 10px;
 }
 
 .preview-title strong {
@@ -651,6 +692,10 @@ html, body {
 
     .modal-content {
         width: 95%;
+    }
+
+    .contact-editor {
+        grid-template-columns: 1fr;
     }
 }
 

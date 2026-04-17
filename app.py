@@ -399,6 +399,16 @@ def generate():
         base_resume = load_base_resume()
         merged_resume = parse_updated_content_to_resume(content, base_resume)
         merged_resume = apply_profile_overrides(merged_resume)
+        contact_override = data.get("contact_override") or {}
+        if isinstance(contact_override, dict):
+            merged_resume["contact"] = {
+                **merged_resume.get("contact", {}),
+                **{
+                    key: str(contact_override.get(key, "")).strip()
+                    for key in ("location", "phone", "email")
+                    if str(contact_override.get(key, "")).strip()
+                },
+            }
 
         # Create output directory
         title = merged_resume.get("title", "Resume")

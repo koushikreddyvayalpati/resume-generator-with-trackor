@@ -57,9 +57,18 @@ class ResumeGenerator {
         this.profileCertifications = document.getElementById("profileCertifications");
         this.profileProjects = document.getElementById("profileProjects");
 
+        // Inline contact editor
+        this.previewLocation = document.getElementById("previewLocation");
+        this.previewPhone = document.getElementById("previewPhone");
+        this.previewEmail = document.getElementById("previewEmail");
+        this.contactSaveStatus = document.getElementById("contactSaveStatus");
+
         // Base resume for local parsing
         this.baseResume = null;
+        this.currentProfile = null;
+        this.contactSaveTimeout = null;
         this.loadBaseResume();
+        this.loadProfile();
 
         // Event listeners
         this.contentInput.addEventListener("input", () => this.onContentChange());
@@ -87,6 +96,11 @@ class ResumeGenerator {
         this.profileCancel.addEventListener("click", () => this.closeProfile());
         this.profileModalOverlay.addEventListener("click", () => this.closeProfile());
         this.profileSave.addEventListener("click", () => this.saveProfile());
+
+        [this.previewLocation, this.previewPhone, this.previewEmail].forEach((input) => {
+            input.addEventListener("input", () => this.onContactChange());
+            input.addEventListener("blur", () => this.saveInlineContact());
+        });
 
         // Drag and drop support for directory input
         this.outputDirInput.addEventListener("dragover", (e) => {
@@ -126,9 +140,102 @@ class ResumeGenerator {
         try {
             const response = await fetch("/config/base_resume.json");
             this.baseResume = await response.json();
+            this.populateContactEditor();
         } catch (error) {
             console.error("Failed to load base resume:", error);
             this.baseResume = {};
+        }
+    }
+
+    async loadProfile() {
+        try {
+            const response = await fetch("/api/profile");
+            this.currentProfile = await response.json();
+            this.populateContactEditorFromProfile(true);
+        } catch (error) {
+            console.error("Failed to load profile:", error);
+            this.currentProfile = null;
+        }
+    }
+
+    getCurrentContact() {
+        return {
+            location: this.previewLocation?.value.trim() || "",
+            phone: this.previewPhone?.value.trim() || "",
+            email: this.previewEmail?.value.trim() || "",
+        };
+    }
+
+    populateContactEditor() {
+        const contact = this.currentProfile?.contact || this.baseResume?.contact;
+        if (!contact || !this.previewLocation || this.previewLocation.value || this.previewPhone.value || this.previewEmail.value) {
+            return;
+        }
+
+        this.previewLocation.value = contact.location || "";
+        this.previewPhone.value = contact.phone || "";
+        this.previewEmail.value = contact.email || "";
+    }
+
+    applyProfileToPreview(preview) {
+        const contact = this.getCurrentContact();
+        return {
+            ...preview,
+            name: this.currentProfile?.name || preview.name || this.baseResume?.name || "",
+            contact: {
+                ...(preview.contact || this.baseResume?.contact || {}),
+                ...contact,
+            },
+            projects: this.currentProfile?.projects || preview.projects,
+            certifications: this.currentProfile?.certifications || preview.certifications,
+        };
+    }
+
+    onContactChange() {
+        const content = this.contentInput.value.trim();
+        if (content) {
+            this.loadPreview(content);
+        }
+
+        clearTimeout(this.contactSaveTimeout);
+        this.contactSaveStatus.textContent = "Unsaved";
+        this.contactSaveTimeout = setTimeout(() => this.saveInlineContact(), 800);
+    }
+
+    async saveInlineContact() {
+        clearTimeout(this.contactSaveTimeout);
+        if (!this.currentProfile) return;
+
+        const payload = {
+            ...this.currentProfile,
+            contact: {
+                ...(this.currentProfile.contact || {}),
+                ...this.getCurrentContact(),
+            },
+        };
+
+        this.contactSaveStatus.textContent = "Saving...";
+        try {
+            const response = await fetch("/api/profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.currentProfile = data.profile;
+                this.contactSaveStatus.textContent = "Saved";
+                setTimeout(() => {
+                    if (this.contactSaveStatus.textContent === "Saved") {
+                        this.contactSaveStatus.textContent = "";
+                    }
+                }, 1200);
+            } else {
+                this.contactSaveStatus.textContent = "Save failed";
+            }
+        } catch (error) {
+            console.error("Contact save error:", error);
+            this.contactSaveStatus.textContent = "Save failed";
         }
     }
 
@@ -207,7 +314,7 @@ class ResumeGenerator {
 
     async loadPreview(content) {
         if (!this.baseResume) return;
-        const preview = parseUpdatedContentToResume(content, this.baseResume);
+        const preview = this.applyProfileToPreview(parseUpdatedContentToResume(content, this.baseResume));
         const validation = validateUpdatedContent(content);
         this.displayPreview(preview);
         if (validation.errors.length > 0) {
@@ -230,7 +337,13 @@ class ResumeGenerator {
         // Title
         if (preview.title) {
             const boldTitle = applyBold(preview.title);
-            html += `<div class="preview-section"><h3 class="preview-title">${boldTitle}</h3></div>`;
+            const contact = preview.contact || {};
+            const contactLine = [contact.location, contact.phone, contact.email].filter(Boolean).join(" | ");
+            html += `<div class="preview-section"><h3 class="preview-title">${boldTitle}</h3>`;
+            if (contactLine) {
+                html += `<div class="preview-contact">${contactLine}</div>`;
+            }
+            html += `</div>`;
         }
 
         // Summary
@@ -349,6 +462,7 @@ class ResumeGenerator {
         try {
             const response = await fetch("/api/profile");
             const profile = await response.json();
+            this.currentProfile = profile;
             this.profileName.value = profile.name || "";
             this.profileLocation.value = profile.contact?.location || "";
             this.profilePhone.value = profile.contact?.phone || "";
@@ -392,6 +506,8 @@ class ResumeGenerator {
             });
             const data = await response.json();
             if (data.success) {
+                this.currentProfile = data.profile;
+                this.populateContactEditorFromProfile(true);
                 this.closeProfile();
             } else {
                 alert(`Error: ${data.error || "Failed to save profile"}`);
@@ -401,6 +517,18 @@ class ResumeGenerator {
             alert("Failed to save profile.");
         } finally {
             this.profileSave.disabled = false;
+        }
+    }
+
+    populateContactEditorFromProfile(force = false) {
+        const contact = this.currentProfile?.contact;
+        if (!contact) return;
+        if (force || !this.previewLocation.value) this.previewLocation.value = contact.location || "";
+        if (force || !this.previewPhone.value) this.previewPhone.value = contact.phone || "";
+        if (force || !this.previewEmail.value) this.previewEmail.value = contact.email || "";
+        const content = this.contentInput.value.trim();
+        if (content) {
+            this.loadPreview(content);
         }
     }
 
@@ -547,7 +675,10 @@ class ResumeGenerator {
         this.showState("loading");
 
         try {
-            const payload = { content };
+            const payload = {
+                content,
+                contact_override: this.getCurrentContact(),
+            };
             if (companyName) {
                 payload.company_name = companyName;
             }
