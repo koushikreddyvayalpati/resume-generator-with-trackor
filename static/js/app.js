@@ -25,6 +25,10 @@ class ResumeGenerator {
         this.loadingState = document.getElementById("loadingState");
         this.successState = document.getElementById("successState");
         this.errorState = document.getElementById("errorState");
+        this.parsedTabBtn = document.getElementById("parsedTabBtn");
+        this.pdfTabBtn = document.getElementById("pdfTabBtn");
+        this.parsedTab = document.getElementById("parsedTab");
+        this.pdfTab = document.getElementById("pdfTab");
 
         // Modal - Instructions
         this.instructionsModal = document.getElementById("instructionsModal");
@@ -106,6 +110,8 @@ class ResumeGenerator {
         this.profileCancel.addEventListener("click", () => this.closeProfile());
         this.profileModalOverlay.addEventListener("click", () => this.closeProfile());
         this.profileSave.addEventListener("click", () => this.saveProfile());
+        this.parsedTabBtn.addEventListener("click", () => this.showTab("parsed"));
+        this.pdfTabBtn.addEventListener("click", () => this.showTab("pdf"));
 
         [this.previewLocation, this.previewPhone, this.previewEmail].forEach((input) => {
             input.addEventListener("input", () => this.onContactChange());
@@ -152,6 +158,9 @@ class ResumeGenerator {
         try {
             const response = await fetch("/config/base_resume.json");
             this.baseResume = await response.json();
+            if (this.baseResume?.contact) {
+                this.identityPresets.outlook = { ...this.baseResume.contact };
+            }
             this.populateContactEditor();
         } catch (error) {
             console.error("Failed to load base resume:", error);
@@ -189,8 +198,8 @@ class ResumeGenerator {
         this.gmailIdentityBtn.classList.toggle("active", identity === "gmail");
     }
 
-    rememberOutlookPreset(contact) {
-        if (!this.identityPresets.outlook) {
+    rememberOutlookPreset(contact, force = false) {
+        if (force || !this.identityPresets.outlook) {
             this.identityPresets.outlook = { ...contact };
         }
     }
@@ -264,10 +273,10 @@ class ResumeGenerator {
                 body: JSON.stringify(payload),
             });
             const data = await response.json();
-        if (data.success) {
-            this.currentProfile = data.profile;
-            this.updateIdentityButtons(this.previewEmail.value === this.identityPresets.gmail.email ? "gmail" : "outlook");
-            this.contactSaveStatus.textContent = "Saved";
+            if (data.success) {
+                this.currentProfile = data.profile;
+                this.updateIdentityButtons(this.previewEmail.value === this.identityPresets.gmail.email ? "gmail" : "outlook");
+                this.contactSaveStatus.textContent = "Saved";
                 setTimeout(() => {
                     if (this.contactSaveStatus.textContent === "Saved") {
                         this.contactSaveStatus.textContent = "";
@@ -280,6 +289,14 @@ class ResumeGenerator {
             console.error("Contact save error:", error);
             this.contactSaveStatus.textContent = "Save failed";
         }
+    }
+
+    showTab(tab) {
+        const showPdf = tab === "pdf";
+        this.parsedTabBtn.classList.toggle("active", !showPdf);
+        this.pdfTabBtn.classList.toggle("active", showPdf);
+        this.parsedTab.classList.toggle("active", !showPdf);
+        this.pdfTab.classList.toggle("active", showPdf);
     }
 
     // Auto-validate and preview with debounce
@@ -566,7 +583,6 @@ class ResumeGenerator {
     populateContactEditorFromProfile(force = false) {
         const contact = this.currentProfile?.contact;
         if (!contact) return;
-        this.rememberOutlookPreset(contact);
         if (force || !this.previewLocation.value) this.previewLocation.value = contact.location || "";
         if (force || !this.previewPhone.value) this.previewPhone.value = contact.phone || "";
         if (force || !this.previewEmail.value) this.previewEmail.value = contact.email || "";
@@ -745,6 +761,7 @@ class ResumeGenerator {
                 this.outputDir = data.output_dir;
 
                 // Show success state and start polling
+                this.showTab("pdf");
                 this.showState("success");
                 this.startStatusPolling();
             } else {
@@ -932,12 +949,15 @@ class ResumeGenerator {
                 this.initialState.style.display = "block";
                 break;
             case "loading":
+                this.showTab("pdf");
                 this.loadingState.style.display = "block";
                 break;
             case "success":
+                this.showTab("pdf");
                 this.successState.style.display = "block";
                 break;
             case "error":
+                this.showTab("pdf");
                 this.errorState.style.display = "block";
                 break;
         }
@@ -954,9 +974,7 @@ class ResumeGenerator {
         this.pdfPath = null;
         this.outputDir = null;
         clearInterval(this.statusCheckInterval);
-
-        // Disable comparison mode
-        document.querySelector(".app-content").classList.remove("comparison-mode");
+        this.showTab("parsed");
 
         // Revoke object URLs to free memory
         const pdfPreview = document.getElementById("pdfPreview");

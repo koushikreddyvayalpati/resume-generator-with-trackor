@@ -25,115 +25,86 @@
             </div>
         </header>
 
-        <!-- Main Layout: Input on Left, Output on Right -->
+        <div class="action-toolbar">
+            <div class="toolbar-group identity-selector">
+                <button type="button" id="outlookIdentityBtn" class="identity-option active">Outlook</button>
+                <button type="button" id="gmailIdentityBtn" class="identity-option">Gmail</button>
+            </div>
+            <div class="toolbar-group contact-editor">
+                <input type="text" id="previewLocation" class="contact-input" placeholder="Location">
+                <input type="text" id="previewPhone" class="contact-input" placeholder="Phone">
+                <input type="email" id="previewEmail" class="contact-input" placeholder="Email">
+                <span id="contactSaveStatus" class="inline-status"></span>
+            </div>
+            <div class="toolbar-group generate-controls">
+                <input type="text" id="companyName" class="folder-input" placeholder="Company name">
+                <input type="text" id="folderName" class="folder-input" placeholder="Folder override">
+                <span class="char-count"><span id="charCount">0</span> chars</span>
+                <button id="generateBtn" class="btn btn-primary" disabled>Generate</button>
+            </div>
+        </div>
+
         <div class="app-content">
-            <!-- LEFT COLUMN: Input + Preview -->
-            <div class="left-column">
-                <!-- Input Section -->
-                <div class="input-panel">
-                    <textarea
-                        id="contentInput"
-                        class="resume-input"
-                        placeholder="Paste resume content here..."
-                        spellcheck="false"
-                    ></textarea>
+            <section class="editor-panel">
+                <div class="panel-header">
+                    <h2>Paste / Edit</h2>
+                    <span id="validationStatus" class="status-badge"></span>
+                </div>
+                <textarea
+                    id="contentInput"
+                    class="resume-input"
+                    placeholder="Paste resume content here..."
+                    spellcheck="false"
+                ></textarea>
+                <div id="validationDisplay" class="validation-info" style="display: none;">
+                    <div id="errorsList" class="error-list"></div>
+                </div>
+            </section>
 
-                    <div class="input-controls">
-                        <span class="char-count"><span id="charCount">0</span> chars</span>
-                        <input
-                            type="text"
-                            id="companyName"
-                            class="folder-input"
-                            placeholder="Company name"
-                        >
-                        <input
-                            type="text"
-                            id="folderName"
-                            class="folder-input"
-                            placeholder="Folder override"
-                        >
-                        <button id="generateBtn" class="btn btn-primary" disabled>
-                            Generate
-                        </button>
-                    </div>
+            <section class="workspace-panel">
+                <div class="tabs">
+                    <button type="button" id="parsedTabBtn" class="tab-btn active">Parsed Preview</button>
+                    <button type="button" id="pdfTabBtn" class="tab-btn">PDF Preview</button>
+                </div>
 
-                    <!-- Validation Status -->
-                    <div id="validationDisplay" class="validation-info" style="display: none;">
-                        <div id="validationStatus" class="status-badge"></div>
-                        <div id="errorsList" class="error-list"></div>
+                <div id="parsedTab" class="tab-panel active">
+                    <div class="preview-panel">
+                        <div id="previewContainer" class="preview-content"></div>
                     </div>
                 </div>
 
-                <!-- Preview Panel -->
-                <div class="preview-panel">
-                    <div class="preview-panel-header">
-                        <h3>Preview</h3>
-                        <span id="contactSaveStatus" class="inline-status"></span>
-                    </div>
-                    <div class="identity-selector">
-                        <button type="button" id="outlookIdentityBtn" class="identity-option active">Outlook</button>
-                        <button type="button" id="gmailIdentityBtn" class="identity-option">Gmail</button>
-                    </div>
-                    <div class="contact-editor">
-                        <input
-                            type="text"
-                            id="previewLocation"
-                            class="contact-input"
-                            placeholder="Location"
-                        >
-                        <input
-                            type="text"
-                            id="previewPhone"
-                            class="contact-input"
-                            placeholder="Phone"
-                        >
-                        <input
-                            type="email"
-                            id="previewEmail"
-                            class="contact-input"
-                            placeholder="Email"
-                        >
-                    </div>
-                    <div id="previewContainer" class="preview-content"></div>
-                </div>
-            </div>
-
-            <!-- RIGHT COLUMN: Output -->
-            <div class="right-column">
-                <!-- Initial State -->
-                <div id="initialState" class="output-panel" style="display: flex; align-items: center; justify-content: center; color: #999;">
-                    Paste content and click Generate
-                </div>
-
-                <!-- Loading State -->
-                <div id="loadingState" class="output-panel" style="display: none;">
-                    <div class="spinner"></div>
-                    <p>Generating resume...</p>
-                </div>
-
-                <!-- Success State -->
-                <div id="successState" class="output-panel" style="display: none;">
-                    <div id="downloadSection" style="display: none;">
-                        <button id="downloadBtn" class="btn btn-success">📥 Download</button>
-                        <button id="openFolderBtn" class="btn btn-secondary">Open Folder</button>
-                        <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
+                <div id="pdfTab" class="tab-panel">
+                    <div id="initialState" class="output-panel" style="display: flex; align-items: center; justify-content: center; color: #999;">
+                        Generate a resume to preview the PDF
                     </div>
 
-                    <div id="previewSection" style="display: none;">
-                        <div class="preview-header">
-                            <span>PDF Preview</span>
-                            <span id="statusPDF">⏳ Converting...</span>
+                    <div id="loadingState" class="output-panel" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Generating resume...</p>
+                    </div>
+
+                    <div id="successState" class="output-panel" style="display: none;">
+                        <div id="downloadSection" style="display: none;">
+                            <button id="downloadBtn" class="btn btn-success">Download</button>
+                            <button id="openFolderBtn" class="btn btn-secondary">Open Folder</button>
+                            <button id="refreshBtn" class="btn btn-secondary">Refresh</button>
                         </div>
-                        <iframe id="pdfPreview" frameborder="0"></iframe>
+
+                        <div id="previewSection" style="display: none;">
+                            <div class="preview-header">
+                                <span>PDF Preview</span>
+                                <span id="statusPDF">Converting...</span>
+                            </div>
+                            <iframe id="pdfPreview" frameborder="0"></iframe>
+                        </div>
+                    </div>
+
+                    <div id="errorState" class="output-panel error" style="display: none;">
+                        <p id="errorMessage"></p>
+                        <button id="retryBtn" class="btn btn-secondary">Try Again</button>
                     </div>
                 </div>
-
-                <!-- Error State -->
-                <div id="errorState" class="output-panel error" style="display: none;">
-                    <p id="errorMessage"></p>
-                    <button id="retryBtn" class="btn btn-secondary">Try Again</button>
-                </div>
-            </div>
+            </section>
         </div>
     </div>
 

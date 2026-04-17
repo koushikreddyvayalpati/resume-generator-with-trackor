@@ -83,33 +83,61 @@ html, body {
     font-weight: 600;
 }
 
+.action-toolbar {
+    background: white;
+    border-bottom: 1px solid var(--gray-200);
+    display: grid;
+    grid-template-columns: auto minmax(360px, 1fr) minmax(420px, 1fr);
+    gap: 10px;
+    padding: 10px 12px;
+    align-items: center;
+}
+
+.toolbar-group {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+}
+
+.generate-controls .folder-input {
+    min-width: 150px;
+}
+
 /* Main Content */
 .app-content {
     flex: 1;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(360px, 0.9fr) minmax(520px, 1.1fr);
     gap: 12px;
     padding: 12px;
     overflow: hidden;
 }
 
-.left-column, .right-column {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    overflow: hidden;
-}
-
-/* Input Panel */
-.input-panel {
+.editor-panel,
+.workspace-panel {
     background: white;
     border-radius: 8px;
-    padding: 12px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
-    flex: 1;
     min-height: 0;
+    overflow: hidden;
+}
+
+.panel-header {
+    align-items: center;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 10px 12px;
+}
+
+.panel-header h2 {
+    color: var(--gray-900);
+    font-size: 1rem;
+    font-weight: 700;
 }
 
 .resume-input {
@@ -122,6 +150,8 @@ html, body {
     resize: none;
     outline: none;
     transition: border-color 0.2s ease;
+    margin: 12px;
+    min-height: 0;
 }
 
 .resume-input:focus {
@@ -156,7 +186,7 @@ html, body {
 
 /* Validation Info */
 .validation-info {
-    margin-top: 10px;
+    margin: 0 12px 12px;
     padding: 10px;
     border-radius: 6px;
     background: var(--gray-100);
@@ -192,14 +222,11 @@ html, body {
 
 /* Preview Panel */
 .preview-panel {
-    background: white;
-    border-radius: 8px;
-    padding: 16px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    padding: 14px;
 }
 
 .preview-panel-header {
@@ -226,7 +253,7 @@ html, body {
 .identity-selector {
     display: flex;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 0;
 }
 
 .identity-option {
@@ -248,9 +275,10 @@ html, body {
 
 .contact-editor {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr) minmax(170px, 1.4fr) auto;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 0;
+    min-width: 0;
 }
 
 .contact-input {
@@ -386,10 +414,7 @@ html, body {
 
 /* Output Panel */
 .output-panel {
-    background: white;
-    border-radius: 8px;
     padding: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     flex: 1;
@@ -422,14 +447,50 @@ html, body {
     border-radius: 6px;
     border: 1px solid var(--gray-300);
     width: 100%;
-    min-height: 800px;
+    min-height: 0;
 }
 
 #downloadSection {
     display: flex;
     gap: 10px;
-    padding-top: 12px;
-    border-top: 1px solid var(--gray-200);
+    padding-bottom: 12px;
+}
+
+.tabs {
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+}
+
+.tab-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--gray-600);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 700;
+    padding: 8px 12px;
+}
+
+.tab-btn.active {
+    background: white;
+    border-color: var(--gray-300);
+    color: var(--primary);
+}
+
+.tab-panel {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.tab-panel.active {
+    display: flex;
+    flex-direction: column;
 }
 
 .spinner {
@@ -690,17 +751,22 @@ html, body {
 
 /* Responsive */
 @media (max-width: 1024px) {
+    .action-toolbar {
+        grid-template-columns: 1fr;
+    }
+
     .app-content {
         grid-template-columns: 1fr;
         gap: 10px;
+        overflow-y: auto;
     }
 
-    .left-column {
-        max-height: 50%;
+    .editor-panel {
+        min-height: 45vh;
     }
 
-    .right-column {
-        max-height: 50%;
+    .workspace-panel {
+        min-height: 55vh;
     }
 }
 
@@ -719,6 +785,16 @@ html, body {
 
     .contact-editor {
         grid-template-columns: 1fr;
+    }
+
+    .generate-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .generate-controls .folder-input,
+    .generate-controls .btn {
+        width: 100%;
     }
 }
 
