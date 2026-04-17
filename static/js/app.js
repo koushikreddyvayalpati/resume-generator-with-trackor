@@ -297,6 +297,7 @@ class ResumeGenerator {
         this.pdfTabBtn.classList.toggle("active", showPdf);
         this.parsedTab.classList.toggle("active", !showPdf);
         this.pdfTab.classList.toggle("active", showPdf);
+        document.querySelector(".app-content")?.classList.toggle("pdf-mode", showPdf);
     }
 
     // Auto-validate and preview with debounce
@@ -789,7 +790,7 @@ class ResumeGenerator {
         const previewSection = document.getElementById("previewSection");
         const statusPDF = document.getElementById("statusPDF");
 
-        if (previewSection) previewSection.style.display = "block";
+        if (previewSection) previewSection.style.display = "flex";
         if (statusPDF) {
             statusPDF.innerHTML = '<span class="spinner"></span> Generating PDF... Please wait';
         }
@@ -855,11 +856,11 @@ class ResumeGenerator {
             return;
         }
 
-        const url = `/api/download?path=${encodeURIComponent(this.pdfPath)}&preview=true`;
+        const url = `/api/download?path=${encodeURIComponent(this.pdfPath)}&preview=true#view=FitH&toolbar=0&navpanes=0`;
         console.log("Setting iframe src to:", url);
         pdfPreview.src = url;
         pdfPreview.style.display = "block";
-        previewSection.style.display = "block";
+        previewSection.style.display = "flex";
         console.log("Preview section shown");
     }
 
@@ -868,7 +869,7 @@ class ResumeGenerator {
         const refreshSection = document.getElementById("refreshSection");
         console.log("showDownloadOption called, downloadSection:", downloadSection);
         if (downloadSection) {
-            downloadSection.style.display = "block";
+            downloadSection.style.display = "flex";
             console.log("Download section shown");
         }
         if (refreshSection) refreshSection.style.display = "none";
@@ -946,19 +947,19 @@ class ResumeGenerator {
         // Show selected state
         switch (state) {
             case "initial":
-                this.initialState.style.display = "block";
+                this.initialState.style.display = "flex";
                 break;
             case "loading":
                 this.showTab("pdf");
-                this.loadingState.style.display = "block";
+                this.loadingState.style.display = "flex";
                 break;
             case "success":
                 this.showTab("pdf");
-                this.successState.style.display = "block";
+                this.successState.style.display = "flex";
                 break;
             case "error":
                 this.showTab("pdf");
-                this.errorState.style.display = "block";
+                this.errorState.style.display = "flex";
                 break;
         }
     }
