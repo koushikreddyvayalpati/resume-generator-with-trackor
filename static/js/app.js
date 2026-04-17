@@ -297,7 +297,6 @@ class ResumeGenerator {
         this.pdfTabBtn.classList.toggle("active", showPdf);
         this.parsedTab.classList.toggle("active", !showPdf);
         this.pdfTab.classList.toggle("active", showPdf);
-        document.querySelector(".app-content")?.classList.toggle("pdf-mode", showPdf);
     }
 
     // Auto-validate and preview with debounce

@@ -114,14 +114,10 @@ html, body {
 .app-content {
     flex: 1;
     display: grid;
-    grid-template-columns: minmax(360px, 0.9fr) minmax(520px, 1.1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 12px;
     padding: 12px;
     overflow: hidden;
-}
-
-.app-content.pdf-mode {
-    grid-template-columns: minmax(300px, 0.5fr) minmax(0, 1.5fr);
 }
 
 .editor-panel,
@@ -770,8 +766,7 @@ html, body {
 
 /* Responsive */
 @media (max-width: 1024px) {
-    .action-toolbar,
-    .app-content.pdf-mode {
+    .action-toolbar {
         grid-template-columns: 1fr;
     }
 
