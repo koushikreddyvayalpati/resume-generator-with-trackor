@@ -72,7 +72,7 @@ class ResumeGenerator {
             outlook: null,
             gmail: {
                 location: "Dallas, TX",
-                phone: "4699635323",
+                phone: "(469)963-5323",
                 email: "tmanikonda.1@gmail.com",
             },
         };
