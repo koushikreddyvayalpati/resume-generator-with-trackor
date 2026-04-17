@@ -223,6 +223,29 @@ html, body {
     white-space: nowrap;
 }
 
+.identity-selector {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.identity-option {
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    background: var(--gray-50);
+    color: var(--gray-700);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 7px 12px;
+}
+
+.identity-option.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
 .contact-editor {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));

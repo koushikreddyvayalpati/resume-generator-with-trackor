@@ -62,6 +62,16 @@ class ResumeGenerator {
         this.previewPhone = document.getElementById("previewPhone");
         this.previewEmail = document.getElementById("previewEmail");
         this.contactSaveStatus = document.getElementById("contactSaveStatus");
+        this.outlookIdentityBtn = document.getElementById("outlookIdentityBtn");
+        this.gmailIdentityBtn = document.getElementById("gmailIdentityBtn");
+        this.identityPresets = {
+            outlook: null,
+            gmail: {
+                location: "Dallas, TX",
+                phone: "4699635323",
+                email: "tmanikonda.1@gmail.com",
+            },
+        };
 
         // Base resume for local parsing
         this.baseResume = null;
@@ -101,6 +111,8 @@ class ResumeGenerator {
             input.addEventListener("input", () => this.onContactChange());
             input.addEventListener("blur", () => this.saveInlineContact());
         });
+        this.outlookIdentityBtn.addEventListener("click", () => this.applyIdentity("outlook"));
+        this.gmailIdentityBtn.addEventListener("click", () => this.applyIdentity("gmail"));
 
         // Drag and drop support for directory input
         this.outputDirInput.addEventListener("dragover", (e) => {
@@ -166,15 +178,45 @@ class ResumeGenerator {
         };
     }
 
+    setCurrentContact(contact) {
+        this.previewLocation.value = contact.location || "";
+        this.previewPhone.value = contact.phone || "";
+        this.previewEmail.value = contact.email || "";
+    }
+
+    updateIdentityButtons(identity) {
+        this.outlookIdentityBtn.classList.toggle("active", identity === "outlook");
+        this.gmailIdentityBtn.classList.toggle("active", identity === "gmail");
+    }
+
+    rememberOutlookPreset(contact) {
+        if (!this.identityPresets.outlook) {
+            this.identityPresets.outlook = { ...contact };
+        }
+    }
+
+    applyIdentity(identity) {
+        if (identity === "outlook") {
+            const contact = this.identityPresets.outlook || this.currentProfile?.contact || this.baseResume?.contact || {};
+            this.setCurrentContact(contact);
+        } else {
+            this.setCurrentContact(this.identityPresets.gmail);
+        }
+
+        this.updateIdentityButtons(identity);
+        this.onContactChange();
+        this.saveInlineContact();
+    }
+
     populateContactEditor() {
         const contact = this.currentProfile?.contact || this.baseResume?.contact;
         if (!contact || !this.previewLocation || this.previewLocation.value || this.previewPhone.value || this.previewEmail.value) {
             return;
         }
 
-        this.previewLocation.value = contact.location || "";
-        this.previewPhone.value = contact.phone || "";
-        this.previewEmail.value = contact.email || "";
+        this.rememberOutlookPreset(contact);
+        this.setCurrentContact(contact);
+        this.updateIdentityButtons("outlook");
     }
 
     applyProfileToPreview(preview) {
@@ -222,9 +264,10 @@ class ResumeGenerator {
                 body: JSON.stringify(payload),
             });
             const data = await response.json();
-            if (data.success) {
-                this.currentProfile = data.profile;
-                this.contactSaveStatus.textContent = "Saved";
+        if (data.success) {
+            this.currentProfile = data.profile;
+            this.updateIdentityButtons(this.previewEmail.value === this.identityPresets.gmail.email ? "gmail" : "outlook");
+            this.contactSaveStatus.textContent = "Saved";
                 setTimeout(() => {
                     if (this.contactSaveStatus.textContent === "Saved") {
                         this.contactSaveStatus.textContent = "";
@@ -523,9 +566,11 @@ class ResumeGenerator {
     populateContactEditorFromProfile(force = false) {
         const contact = this.currentProfile?.contact;
         if (!contact) return;
+        this.rememberOutlookPreset(contact);
         if (force || !this.previewLocation.value) this.previewLocation.value = contact.location || "";
         if (force || !this.previewPhone.value) this.previewPhone.value = contact.phone || "";
         if (force || !this.previewEmail.value) this.previewEmail.value = contact.email || "";
+        this.updateIdentityButtons(this.previewEmail.value === this.identityPresets.gmail.email ? "gmail" : "outlook");
         const content = this.contentInput.value.trim();
         if (content) {
             this.loadPreview(content);
