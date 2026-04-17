@@ -100,7 +100,82 @@ TEMPLATE_PATH = os.getenv("RESUME_TEMPLATE_PATH", DEFAULT_TEMPLATE)
 BULLET = "●"
 TEXT_W = 7.884   # usable width (A4 8.278" − 2 × 0.197")
 
+FORMAT_PROFILES = {
+    "outlook": {
+        "font_name": None,
+        "margins": None,
+        "title_size": 14,
+        "contact_size": 10,
+        "body_size": 10,
+        "summary_spacing_before": 6,
+        "section_spacing_before": 6,
+        "experience_gap": 8.3,
+        "project_gap": 13.6,
+        "bullet_spacing": 2.25,
+        "text_width": TEXT_W,
+    },
+    "gmail": {
+        "font_name": "Calibri",
+        "margins": {
+            "top": 0.25,
+            "bottom": 0.25,
+            "left": 0.28,
+            "right": 0.28,
+        },
+        "title_size": 13,
+        "contact_size": 9.5,
+        "body_size": 9.8,
+        "summary_spacing_before": 4,
+        "section_spacing_before": 4,
+        "experience_gap": 6,
+        "project_gap": 9,
+        "bullet_spacing": 1.6,
+        "text_width": 7.718,
+    },
+}
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _format_profile(name) -> dict:
+    return FORMAT_PROFILES.get((name or "outlook").lower(), FORMAT_PROFILES["outlook"])
+
+
+def _set_font_name(r_pr, font_name: str) -> None:
+    r_fonts = r_pr.rFonts
+    if r_fonts is None:
+        r_fonts = OxmlElement("w:rFonts")
+        r_pr.append(r_fonts)
+    for key in ("w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"):
+        r_fonts.set(qn(key), font_name)
+
+
+def _apply_document_profile(doc, profile: dict) -> None:
+    font_name = profile.get("font_name")
+    if font_name:
+        for style_name in ("Normal", "Body Text", "List Paragraph", "Heading 1", "Heading 2", "Title", "p1"):
+            try:
+                style = doc.styles[style_name]
+            except KeyError:
+                continue
+            style.font.name = font_name
+            _set_font_name(style._element.get_or_add_rPr(), font_name)
+
+    margins = profile.get("margins")
+    if margins:
+        for section in doc.sections:
+            section.top_margin = Inches(margins["top"])
+            section.bottom_margin = Inches(margins["bottom"])
+            section.left_margin = Inches(margins["left"])
+            section.right_margin = Inches(margins["right"])
+
+
+def _format_run(run, size=None, font_name=None):
+    if size is not None:
+        run.font.size = Pt(size)
+    if font_name:
+        run.font.name = font_name
+        _set_font_name(run._element.get_or_add_rPr(), font_name)
+    return run
 
 def _add_right_tab(para, pos_inches=TEXT_W):
     """Append a right-aligned tab stop to a paragraph."""
@@ -115,7 +190,7 @@ def _add_right_tab(para, pos_inches=TEXT_W):
     tabs.append(tab)
 
 
-def _runs(para, text, size=10):
+def _runs(para, text, size=10, font_name=None):
     """
     Split text on **bold** markers and append correctly-formatted runs.
     Non-marked parts → normal weight; marked parts → bold.
@@ -123,7 +198,7 @@ def _runs(para, text, size=10):
     for i, part in enumerate(re.split(r'\*\*(.*?)\*\*', text)):
         if part:
             r = para.add_run(part)
-            r.font.size = Pt(size)
+            _format_run(r, size=size, font_name=font_name)
             # Ensure bold is properly set for odd-numbered parts (marked text)
             if i % 2 == 1:  # Odd indices are **bold** text
                 r.bold = True
@@ -193,9 +268,13 @@ def _add_section_borders(para):
 
 # ── Resume builder ─────────────────────────────────────────────────────────────
 
-def build_resume_docx(resume_data: dict, output_docx: str) -> None:
+def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str = "outlook") -> None:
     # Load reference template — inherits ALL styles, A4 page, 0.197" margins
     doc  = Document(TEMPLATE_PATH)
+    profile = _format_profile(format_profile)
+    font_name = profile.get("font_name")
+    body_size = profile["body_size"]
+    _apply_document_profile(doc, profile)
     body = doc.element.body
 
     # Clear every paragraph/table/SDT in the body; keep sectPr (page layout)
@@ -214,7 +293,7 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
     p.paragraph_format.space_before = Pt(2.2)
     p.paragraph_format.space_after  = Pt(0)
     r = p.add_run(d['title'])
-    r.font.size = Pt(14)
+    _format_run(r, size=profile["title_size"], font_name=font_name)
     r.bold      = True
 
     # ── CONTACT LINE ──────────────────────────────────────────────────────
@@ -224,19 +303,19 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
     p.paragraph_format.space_before = Pt(2.2)
     p.paragraph_format.space_after  = Pt(0)
     r  = p.add_run(f"{c['location']} | {c['phone']} | {c['email']}")
-    r.font.size = Pt(10)
+    _format_run(r, size=profile["contact_size"], font_name=font_name)
 
     _spacer(doc, after_pt=6)
 
     # ── SUMMARY ───────────────────────────────────────────────────────────
     p_h = doc.add_paragraph('SUMMARY', style='Heading 1')
-    p_h.paragraph_format.space_before = Pt(6)
+    p_h.paragraph_format.space_before = Pt(profile["section_spacing_before"])
     _add_section_borders(p_h)
     p = doc.add_paragraph(style='Normal')
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_before = Pt(profile["summary_spacing_before"])
     p.paragraph_format.space_after = Pt(0)
-    _runs(p, d['summary'])
+    _runs(p, d['summary'], size=body_size, font_name=font_name)
 
     _spacer(doc, after_pt=6)
 
@@ -247,10 +326,10 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
         p = doc.add_paragraph(style='p1')
         _set_compact_spacing(p)
         r1 = p.add_run(sk['category'])
-        r1.font.size = Pt(10)
+        _format_run(r1, size=body_size, font_name=font_name)
         r1.bold      = True
         r2 = p.add_run(f": {sk['items']}")
-        r2.font.size = Pt(10)
+        _format_run(r2, size=body_size, font_name=font_name)
 
     # ── PROFESSIONAL EXPERIENCE ───────────────────────────────────────────
     p_h = doc.add_paragraph('PROFESSIONAL EXPERIENCE', style='Heading 1')
@@ -260,21 +339,21 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
         # Company | Location
         p = doc.add_paragraph(f"{exp['company']} | {exp['location']}",
                                style='Heading 2')
-        p.paragraph_format.space_before = Pt(8.3 if i > 0 else 1.9)
+        p.paragraph_format.space_before = Pt(profile["experience_gap"] if i > 0 else 1.9)
 
         # Title [TAB] Dates  — right-tab aligned, bold-italic
         p = doc.add_paragraph(style='Normal')
         p.paragraph_format.space_before = Pt(1.9)
         p.paragraph_format.space_after  = Pt(0)
         p.paragraph_format.left_indent  = Inches(0.085)
-        _add_right_tab(p)
+        _add_right_tab(p, profile["text_width"])
         r1 = p.add_run(exp['title'])
-        r1.font.size = Pt(10)
+        _format_run(r1, size=body_size, font_name=font_name)
         r1.bold      = True
         r1.italic    = True
         p.add_run('\t')
         r2 = p.add_run(exp['dates'])
-        r2.font.size = Pt(10)
+        _format_run(r2, size=body_size, font_name=font_name)
         r2.bold      = True
         r2.italic    = True
 
@@ -282,12 +361,12 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
         for b in exp['bullets']:
             p = doc.add_paragraph(style='List Paragraph')
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            p.paragraph_format.space_before = Pt(2.25)
+            p.paragraph_format.space_before = Pt(profile["bullet_spacing"])
             # Set hanging indent for bullet text wrapping
             _set_hanging_indent(p)  # Uses default: left=86 twips (0.06"), hanging=187 twips (0.13")
             r = p.add_run(f"{BULLET} ")
-            r.font.size = Pt(10)
-            _runs(p, b)
+            _format_run(r, size=body_size, font_name=font_name)
+            _runs(p, b, size=body_size, font_name=font_name)
 
     _spacer(doc, after_pt=5)
 
@@ -296,15 +375,15 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
     _add_section_borders(p_h)
     for proj in d['projects']:
         p = doc.add_paragraph(proj['name'], style='Heading 2')
-        p.paragraph_format.space_before = Pt(13.6)
+        p.paragraph_format.space_before = Pt(profile["project_gap"])
 
         for b in proj['bullets']:
             p = doc.add_paragraph(style='Body Text')
             p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
             p.paragraph_format.space_before = Pt(1.55)
             r = p.add_run(f"{BULLET} ")
-            r.font.size = Pt(10)
-            _runs(p, b)
+            _format_run(r, size=body_size, font_name=font_name)
+            _runs(p, b, size=body_size, font_name=font_name)
 
     _spacer(doc, after_pt=5)
 
@@ -320,12 +399,12 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
         p.paragraph_format.space_before = Pt(2.1)
         p.paragraph_format.space_after  = Pt(0)
         p.paragraph_format.left_indent  = Inches(0.053)
-        _add_right_tab(p)
+        _add_right_tab(p, profile["text_width"])
         r1 = p.add_run(edu['institution'])
-        r1.font.size = Pt(10)
+        _format_run(r1, size=body_size, font_name=font_name)
         p.add_run('\t')
         r2 = p.add_run(edu['dates'])
-        r2.font.size = Pt(10)
+        _format_run(r2, size=body_size, font_name=font_name)
         r2.italic    = True
 
     _spacer(doc, after_pt=5)
@@ -338,9 +417,9 @@ def build_resume_docx(resume_data: dict, output_docx: str) -> None:
         p.paragraph_format.space_before = Pt(2.25)
         _set_hanging_indent(p)  # Uses default: left=86 twips (0.06"), hanging=187 twips (0.13")
         r1 = p.add_run(f"{BULLET} ")
-        r1.font.size = Pt(10)
+        _format_run(r1, size=body_size, font_name=font_name)
         r2 = p.add_run(cert)
-        r2.font.size = Pt(10)
+        _format_run(r2, size=body_size, font_name=font_name)
 
     doc.save(output_docx)
     print(f'  DOCX saved → {output_docx}')
@@ -465,8 +544,8 @@ def convert_docx_to_pdf_via_libreoffice(docx_path: str, output_path: str, timeou
         raise RuntimeError(f"PDF conversion failed: {str(e)}")
 
 
-def build_resume_pdf(resume_data: dict, output_path: str, timeout_seconds: int = 180) -> None:
+def build_resume_pdf(resume_data: dict, output_path: str, timeout_seconds: int = 180, format_profile: str = "outlook") -> None:
     """Build .docx then convert to PDF via LibreOffice."""
     docx_path = output_path.replace('.pdf', '.docx')
-    build_resume_docx(resume_data, docx_path)
+    build_resume_docx(resume_data, docx_path, format_profile=format_profile)
     convert_docx_to_pdf_via_libreoffice(docx_path, output_path, timeout_seconds=timeout_seconds)

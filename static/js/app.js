@@ -76,6 +76,7 @@ class ResumeGenerator {
                 email: "tmanikonda.1@gmail.com",
             },
         };
+        this.selectedIdentity = "outlook";
 
         // Base resume for local parsing
         this.baseResume = null;
@@ -194,6 +195,7 @@ class ResumeGenerator {
     }
 
     updateIdentityButtons(identity) {
+        this.selectedIdentity = identity;
         this.outlookIdentityBtn.classList.toggle("active", identity === "outlook");
         this.gmailIdentityBtn.classList.toggle("active", identity === "gmail");
     }
@@ -739,6 +741,7 @@ class ResumeGenerator {
             const payload = {
                 content,
                 contact_override: this.getCurrentContact(),
+                identity: this.selectedIdentity || "outlook",
             };
             if (companyName) {
                 payload.company_name = companyName;

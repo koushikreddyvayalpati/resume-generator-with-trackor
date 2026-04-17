@@ -399,6 +399,10 @@ def generate():
         base_resume = load_base_resume()
         merged_resume = parse_updated_content_to_resume(content, base_resume)
         merged_resume = apply_profile_overrides(merged_resume)
+        identity = str(data.get("identity", "outlook")).strip().lower()
+        if identity not in {"outlook", "gmail"}:
+            identity = "outlook"
+
         contact_override = data.get("contact_override") or {}
         if isinstance(contact_override, dict):
             merged_resume["contact"] = {
@@ -422,7 +426,7 @@ def generate():
 
         # Build DOCX
         docx_path = out_dir / "tharun manikonda resume.docx"
-        build_resume_docx(merged_resume, str(docx_path))
+        build_resume_docx(merged_resume, str(docx_path), format_profile=identity)
 
         # Start background PDF conversion
         pdf_path = out_dir / "tharun manikonda resume.pdf"
@@ -430,6 +434,7 @@ def generate():
         metadata = {
             "folder": folder_name,
             "company_name": company_name,
+            "identity": identity,
             "title": title,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "input_path": str(out_dir / "input.txt"),

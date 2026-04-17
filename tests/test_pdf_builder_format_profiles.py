@@ -1,0 +1,61 @@
+from pathlib import Path
+
+from docx import Document
+from docx.shared import Inches
+
+from pdf_builder import build_resume_docx
+
+
+def assert_near(actual, expected, tolerance=200):
+    assert abs(int(actual) - int(expected)) <= tolerance
+
+
+def sample_resume():
+    return {
+        "name": "Tharun Manikonda",
+        "title": "Software Engineer",
+        "contact": {
+            "location": "Dallas, TX",
+            "phone": "(469)963-5323",
+            "email": "tmanikonda.1@gmail.com",
+        },
+        "summary": "Builds reliable systems.",
+        "technical_skills": [
+            {"category": "Languages", "items": "Python, JavaScript"},
+        ],
+        "experience": [
+            {
+                "company": "Example",
+                "location": "Remote",
+                "title": "Engineer",
+                "dates": "2024 - Present",
+                "bullets": ["Built automation."],
+            },
+        ],
+        "projects": [
+            {"name": "Resume Tool", "bullets": ["Generated resumes."]},
+        ],
+        "education": [
+            {
+                "degree": "MS Computer Science",
+                "institution": "Example University",
+                "dates": "2023",
+            },
+        ],
+        "certifications": ["AWS Certified"],
+    }
+
+
+def test_gmail_format_profile_applies_docx_layout(tmp_path):
+    output_docx = Path(tmp_path) / "gmail.docx"
+
+    build_resume_docx(sample_resume(), str(output_docx), format_profile="gmail")
+
+    doc = Document(str(output_docx))
+    section = doc.sections[0]
+
+    assert_near(section.top_margin, Inches(0.25))
+    assert_near(section.bottom_margin, Inches(0.25))
+    assert_near(section.left_margin, Inches(0.28))
+    assert_near(section.right_margin, Inches(0.28))
+    assert doc.styles["Normal"].font.name == "Calibri"
