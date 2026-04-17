@@ -87,7 +87,7 @@ html, body {
     background: white;
     border-bottom: 1px solid var(--gray-200);
     display: grid;
-    grid-template-columns: minmax(340px, auto) minmax(360px, 1fr) auto;
+    grid-template-columns: auto minmax(360px, 1fr);
     gap: 10px;
     padding: 10px 12px;
     align-items: center;
@@ -101,7 +101,13 @@ html, body {
 }
 
 .company-input {
-    min-width: 190px;
+    flex: 0 1 300px;
+    min-width: 220px;
+}
+
+.generate-controls {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
 }
 
 /* Main Content */
