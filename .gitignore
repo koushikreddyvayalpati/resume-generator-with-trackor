@@ -56,6 +56,7 @@ output/
 outputs/
 tharun-resume/
 generated-resumes/
+vendor/
 # Note: resumes/ IS tracked for template file, but not for generated ones
 
 # Logs and temp files

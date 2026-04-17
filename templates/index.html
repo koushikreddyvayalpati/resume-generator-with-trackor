@@ -12,6 +12,7 @@
         <header class="app-header">
             <h1>📄 Resume Generator</h1>
             <div class="header-actions">
+                <button id="profileBtn" class="btn-icon" title="Profile">ID</button>
                 <button id="instructionsBtn" class="btn-icon" title="Format Guide">?</button>
                 <button id="settingsBtn" class="btn-icon" title="Settings">⚙</button>
                 <span id="conversionStatus" class="badge">
@@ -41,9 +42,15 @@
                         <span class="char-count"><span id="charCount">0</span> chars</span>
                         <input
                             type="text"
+                            id="companyName"
+                            class="folder-input"
+                            placeholder="Company name"
+                        >
+                        <input
+                            type="text"
                             id="folderName"
                             class="folder-input"
-                            placeholder="Folder name (optional)"
+                            placeholder="Folder override"
                         >
                         <button id="generateBtn" class="btn btn-primary" disabled>
                             Generate
@@ -81,6 +88,7 @@
                 <div id="successState" class="output-panel" style="display: none;">
                     <div id="downloadSection" style="display: none;">
                         <button id="downloadBtn" class="btn btn-success">📥 Download</button>
+                        <button id="openFolderBtn" class="btn btn-secondary">Open Folder</button>
                         <button id="refreshBtn" class="btn btn-secondary">🔄 Refresh</button>
                     </div>
 
@@ -142,21 +150,63 @@
             <div class="modal-body">
                 <label for="outputDirInput" style="display: block; margin-bottom: 8px; font-weight: 600;">Output Directory</label>
                 <div class="dir-input-row">
-                    <input type="text" id="outputDirInput" class="settings-input" placeholder="/Users/yourname/Documents/resumes" />
-                    <button id="browseBtn" class="btn btn-primary" style="white-space: nowrap;" title="Browse for directory">📁 Browse</button>
+                    <input type="text" id="outputDirInput" class="settings-input" placeholder="C:\Users\yourname\Documents\Resumes" />
+                    <button id="browseBtn" class="btn btn-primary" style="white-space: nowrap;" title="Browse for directory">Browse</button>
                 </div>
                 <input type="file" id="dirPickerInput" webkitdirectory mozdirectory style="display: none;" />
                 <p class="hint" style="margin-top: 12px; font-size: 0.85rem; color: #6b7280; line-height: 1.6;">
-                    <strong>✅ How to set the path:</strong><br>
-                    <strong>Option 1 (Recommended):</strong> Open Finder/Explorer, navigate to desired folder, and drag-drop into the input field above<br>
-                    <strong>Option 2:</strong> Manually type the full absolute path (e.g., <code style="background: #f3f4f6; padding: 2px 4px; border-radius: 3px;">/Users/yourname/Documents</code>)<br>
-                    <strong>Important:</strong> Must be an absolute path, not relative!<br>
-                    Resumes will be saved as subfolders inside this directory.
+                    Choose where generated resume folders should be saved. Each generation creates a folder with the company and job title, then saves the PDF, DOCX, source input, resume JSON, and metadata together.
                 </p>
             </div>
             <div class="modal-footer">
                 <button id="settingsCancel" class="btn btn-secondary">Cancel</button>
                 <button id="settingsSave" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal" style="display: none;">
+        <div class="modal-overlay" id="profileModalOverlay"></div>
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <h2>Profile</h2>
+                <button id="profileClose" class="btn-close">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="profile-grid">
+                    <label>
+                        Name
+                        <input type="text" id="profileName" class="settings-input" />
+                    </label>
+                    <label>
+                        Location
+                        <input type="text" id="profileLocation" class="settings-input" />
+                    </label>
+                    <label>
+                        Phone
+                        <input type="text" id="profilePhone" class="settings-input" />
+                    </label>
+                    <label>
+                        Email
+                        <input type="text" id="profileEmail" class="settings-input" />
+                    </label>
+                </div>
+                <label class="profile-block">
+                    Certifications
+                    <textarea id="profileCertifications" class="settings-textarea" placeholder="One certification per line"></textarea>
+                </label>
+                <label class="profile-block">
+                    Projects
+                    <textarea id="profileProjects" class="settings-textarea settings-textarea-large" placeholder="Project Name&#10;- bullet one&#10;- bullet two&#10;&#10;Next Project&#10;- bullet one"></textarea>
+                </label>
+                <p class="hint" style="margin-top: 12px; font-size: 0.85rem; color: #6b7280; line-height: 1.6;">
+                    These values are saved as reusable defaults. Your normal paste-and-generate flow stays the same.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button id="profileCancel" class="btn btn-secondary">Cancel</button>
+                <button id="profileSave" class="btn btn-primary">Save Profile</button>
             </div>
         </div>
     </div>

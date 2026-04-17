@@ -6,9 +6,11 @@
 class ResumeGenerator {
     constructor() {
         this.contentInput = document.getElementById("contentInput");
+        this.companyNameInput = document.getElementById("companyName");
         this.folderNameInput = document.getElementById("folderName");
         this.generateBtn = document.getElementById("generateBtn");
         this.downloadBtn = document.getElementById("downloadBtn");
+        this.openFolderBtn = document.getElementById("openFolderBtn");
         this.refreshBtn = document.getElementById("refreshBtn");
         this.retryBtn = document.getElementById("retryBtn");
 
@@ -41,6 +43,20 @@ class ResumeGenerator {
         this.browseBtn = document.getElementById("browseBtn");
         this.dirPickerInput = document.getElementById("dirPickerInput");
 
+        // Modal - Profile
+        this.profileModal = document.getElementById("profileModal");
+        this.profileBtn = document.getElementById("profileBtn");
+        this.profileClose = document.getElementById("profileClose");
+        this.profileCancel = document.getElementById("profileCancel");
+        this.profileSave = document.getElementById("profileSave");
+        this.profileModalOverlay = document.getElementById("profileModalOverlay");
+        this.profileName = document.getElementById("profileName");
+        this.profileLocation = document.getElementById("profileLocation");
+        this.profilePhone = document.getElementById("profilePhone");
+        this.profileEmail = document.getElementById("profileEmail");
+        this.profileCertifications = document.getElementById("profileCertifications");
+        this.profileProjects = document.getElementById("profileProjects");
+
         // Base resume for local parsing
         this.baseResume = null;
         this.loadBaseResume();
@@ -51,6 +67,7 @@ class ResumeGenerator {
         this.folderNameInput.addEventListener("keydown", (e) => this.handleFolderKeydown(e));
         this.generateBtn.addEventListener("click", () => this.generate());
         this.downloadBtn.addEventListener("click", () => this.download());
+        this.openFolderBtn.addEventListener("click", () => this.openGeneratedFolder());
         this.refreshBtn.addEventListener("click", () => this.checkStatus());
         this.retryBtn.addEventListener("click", () => this.reset());
         this.instructionsBtn.addEventListener("click", () => this.openModal());
@@ -64,6 +81,12 @@ class ResumeGenerator {
         this.settingsSave.addEventListener("click", () => this.saveSettings());
         this.browseBtn.addEventListener("click", () => this.browseDirectory());
         this.dirPickerInput.addEventListener("change", (e) => this.handleDirectorySelection(e));
+
+        this.profileBtn.addEventListener("click", () => this.openProfile());
+        this.profileClose.addEventListener("click", () => this.closeProfile());
+        this.profileCancel.addEventListener("click", () => this.closeProfile());
+        this.profileModalOverlay.addEventListener("click", () => this.closeProfile());
+        this.profileSave.addEventListener("click", () => this.saveProfile());
 
         // Drag and drop support for directory input
         this.outputDirInput.addEventListener("dragover", (e) => {
@@ -90,6 +113,7 @@ class ResumeGenerator {
 
         this.statusPath = null;
         this.pdfPath = null;
+        this.outputDir = null;
         this.statusCheckInterval = null;
         this.validationTimeout = null;
         this.isGenerating = false;
@@ -131,11 +155,11 @@ class ResumeGenerator {
     }
 
     handleContentKeydown(e) {
-        // Shift+Enter from content input -> focus folder name
+        // Shift+Enter from content input -> focus company name
         if (e.shiftKey && e.key === "Enter") {
             if (this.isGenerating) return;
             e.preventDefault();
-            this.folderNameInput.focus();
+            this.companyNameInput.focus();
         }
     }
 
@@ -291,6 +315,95 @@ class ResumeGenerator {
         document.body.style.overflow = "auto";
     }
 
+    formatProjects(projects) {
+        return (projects || [])
+            .map((project) => {
+                const bullets = (project.bullets || [])
+                    .map((bullet) => `- ${bullet}`)
+                    .join("\n");
+                return [project.name || "", bullets].filter(Boolean).join("\n");
+            })
+            .filter(Boolean)
+            .join("\n\n");
+    }
+
+    parseProjects(text) {
+        const blocks = text
+            .split(/\n\s*\n/)
+            .map((block) => block.trim())
+            .filter(Boolean);
+
+        return blocks
+            .map((block) => {
+                const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+                const name = lines.shift() || "";
+                const bullets = lines
+                    .map((line) => line.replace(/^[-•●]\s*/, "").trim())
+                    .filter(Boolean);
+                return { name, bullets };
+            })
+            .filter((project) => project.name);
+    }
+
+    async openProfile() {
+        try {
+            const response = await fetch("/api/profile");
+            const profile = await response.json();
+            this.profileName.value = profile.name || "";
+            this.profileLocation.value = profile.contact?.location || "";
+            this.profilePhone.value = profile.contact?.phone || "";
+            this.profileEmail.value = profile.contact?.email || "";
+            this.profileCertifications.value = (profile.certifications || []).join("\n");
+            this.profileProjects.value = this.formatProjects(profile.projects || []);
+            this.profileModal.style.display = "flex";
+            document.body.style.overflow = "hidden";
+        } catch (error) {
+            console.error("Failed to load profile:", error);
+            alert("Could not load profile settings.");
+        }
+    }
+
+    closeProfile() {
+        this.profileModal.style.display = "none";
+        document.body.style.overflow = "auto";
+    }
+
+    async saveProfile() {
+        const payload = {
+            name: this.profileName.value.trim(),
+            contact: {
+                location: this.profileLocation.value.trim(),
+                phone: this.profilePhone.value.trim(),
+                email: this.profileEmail.value.trim(),
+            },
+            certifications: this.profileCertifications.value
+                .split("\n")
+                .map((line) => line.trim())
+                .filter(Boolean),
+            projects: this.parseProjects(this.profileProjects.value),
+        };
+
+        this.profileSave.disabled = true;
+        try {
+            const response = await fetch("/api/profile", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.closeProfile();
+            } else {
+                alert(`Error: ${data.error || "Failed to save profile"}`);
+            }
+        } catch (error) {
+            console.error("Profile save error:", error);
+            alert("Failed to save profile.");
+        } finally {
+            this.profileSave.disabled = false;
+        }
+    }
+
     async saveSettings() {
         const outputDirectory = this.outputDirInput.value.trim();
 
@@ -324,8 +437,23 @@ class ResumeGenerator {
         }
     }
 
-    browseDirectory() {
-        alert("📌 To set the path:\n\n1. Open Finder (Mac) or Explorer (Windows/Linux)\n2. Drag & drop your desired folder into the path field above\n3. OR manually type the full absolute path\n\nExample: /Users/yourname/Documents/resumes");
+    async browseDirectory() {
+        try {
+            const response = await fetch("/api/select-output-directory", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}),
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.outputDirInput.value = data.output_directory;
+            } else if (!data.cancelled) {
+                alert(`Could not open folder picker: ${data.error || "Unknown error"}`);
+            }
+        } catch (error) {
+            console.error("Directory picker error:", error);
+            alert("Could not open the folder picker. Enter the full folder path manually.");
+        }
     }
 
     handleDirectorySelection(event) {
@@ -403,6 +531,7 @@ class ResumeGenerator {
 
     async generate() {
         const content = this.contentInput.value.trim();
+        const companyName = this.companyNameInput.value.trim();
         const folderName = this.folderNameInput.value.trim();
 
         if (!content) {
@@ -413,11 +542,15 @@ class ResumeGenerator {
         this.isGenerating = true;
         this.generateBtn.disabled = true;
         this.contentInput.disabled = true;
+        this.companyNameInput.disabled = true;
         this.folderNameInput.disabled = true;
         this.showState("loading");
 
         try {
             const payload = { content };
+            if (companyName) {
+                payload.company_name = companyName;
+            }
             if (folderName) {
                 payload.folder_name = folderName;
             }
@@ -433,6 +566,7 @@ class ResumeGenerator {
             if (data.success) {
                 this.statusPath = data.status_path;
                 this.pdfPath = data.pdf;
+                this.outputDir = data.output_dir;
 
                 // Show success state and start polling
                 this.showState("success");
@@ -448,6 +582,7 @@ class ResumeGenerator {
             this.isGenerating = false;
             this.generateBtn.disabled = false;
             this.contentInput.disabled = false;
+            this.companyNameInput.disabled = false;
             this.folderNameInput.disabled = false;
         }
     }
@@ -585,6 +720,25 @@ class ResumeGenerator {
         document.body.removeChild(link);
     }
 
+    async openGeneratedFolder() {
+        if (!this.outputDir) return;
+
+        try {
+            const response = await fetch("/api/open-folder", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ path: this.outputDir }),
+            });
+            const data = await response.json();
+            if (!data.success) {
+                alert(`Could not open folder: ${data.error || "Unknown error"}`);
+            }
+        } catch (error) {
+            console.error("Open folder error:", error);
+            alert("Could not open the generated folder.");
+        }
+    }
+
     showError(message) {
         document.getElementById("errorMessage").textContent = message;
     }
@@ -615,12 +769,14 @@ class ResumeGenerator {
 
     reset() {
         this.contentInput.value = "";
+        this.companyNameInput.value = "";
         this.folderNameInput.value = "";
         this.validationDisplay.style.display = "none";
         this.generateBtn.disabled = true;
         this.showState("initial");
         this.statusPath = null;
         this.pdfPath = null;
+        this.outputDir = null;
         clearInterval(this.statusCheckInterval);
 
         // Disable comparison mode

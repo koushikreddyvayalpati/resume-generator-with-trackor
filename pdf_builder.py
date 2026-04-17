@@ -3,7 +3,10 @@ import subprocess
 import os
 import platform
 import shutil
+import sys
+import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 from docx import Document
@@ -16,6 +19,19 @@ from docx.oxml.ns import qn
 load_dotenv()
 
 
+def _app_base_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+def _resource_path(*parts: str) -> Path:
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        return Path(bundle_root).joinpath(*parts)
+    return _app_base_dir().joinpath(*parts)
+
+
 def get_soffice_path():
     """Get LibreOffice soffice command path for current OS."""
     system = platform.system()
@@ -23,14 +39,26 @@ def get_soffice_path():
     # Try common paths for each OS
     paths_to_try = []
 
+    env_path = os.getenv("SOFFICE_PATH") or os.getenv("LIBREOFFICE_PATH")
+    if env_path:
+        paths_to_try.append(env_path)
+
+    base_dir = _app_base_dir()
+    resource_dir = _resource_path()
+
     if system == "Darwin":  # macOS
-        paths_to_try = [
+        paths_to_try += [
             "/opt/homebrew/bin/soffice",
             "/usr/local/bin/soffice",
             "/Applications/LibreOffice.app/Contents/MacOS/soffice"
         ]
     elif system == "Windows":
-        paths_to_try = [
+        paths_to_try += [
+            str(base_dir / "libreoffice" / "program" / "soffice.exe"),
+            str(base_dir / "LibreOfficePortable" / "App" / "libreoffice" / "program" / "soffice.exe"),
+            str(base_dir / "LibreOffice" / "program" / "soffice.exe"),
+            str(resource_dir / "libreoffice" / "program" / "soffice.exe"),
+            str(resource_dir / "LibreOfficePortable" / "App" / "libreoffice" / "program" / "soffice.exe"),
             "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
             "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
             "C:\\Program Files\\LibreOffice\\program",
@@ -45,8 +73,13 @@ def get_soffice_path():
     # Check if any path exists
     for path in paths_to_try:
         try:
-            if os.path.exists(path):
-                return path
+            candidate = Path(path)
+            if candidate.is_dir():
+                executable = candidate / ("soffice.exe" if system == "Windows" else "soffice")
+                if executable.exists():
+                    return str(executable)
+            elif candidate.exists():
+                return str(candidate)
         except Exception:
             continue
 
@@ -62,7 +95,7 @@ def get_soffice_path():
 
 # Configuration - use environment variables with fallback defaults
 # Default to local resumes folder in project directory
-DEFAULT_TEMPLATE = os.path.join(os.path.dirname(__file__), 'resumes', 'Tharun Manikonda Resume.docx')
+DEFAULT_TEMPLATE = str(_resource_path('resumes', 'Tharun Manikonda Resume.docx'))
 TEMPLATE_PATH = os.getenv("RESUME_TEMPLATE_PATH", DEFAULT_TEMPLATE)
 BULLET = "●"
 TEXT_W = 7.884   # usable width (A4 8.278" − 2 × 0.197")
@@ -366,9 +399,20 @@ def _convert_docx_to_pdf_via_libreoffice(docx_path: str, output_path: str, timeo
         print(f"  [PDF] Output directory verified")
 
         # Use LibreOffice headless mode to convert
+        user_installation_dir = Path(tempfile.gettempdir()) / "resume-tool-libreoffice-profile"
+        user_installation_dir.mkdir(parents=True, exist_ok=True)
+        if platform.system() == "Windows":
+            profile_uri = "file:///" + quote(str(user_installation_dir).replace("\\", "/"))
+        else:
+            profile_uri = "file://" + quote(str(user_installation_dir))
+
         cmd = [
             soffice_path,
             "--headless",
+            "--nologo",
+            "--nofirststartwizard",
+            "--nolockcheck",
+            f"-env:UserInstallation={profile_uri}",
             "--convert-to", "pdf",
             "--outdir", output_dir,
             docx_path

@@ -10,12 +10,23 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, send_file, Response
+from desktop_runtime import (
+    default_output_dir,
+    is_frozen,
+    load_json_file,
+    open_path,
+    resource_path,
+    settings_path,
+    write_json_file,
+)
+from convert_pdf_job import run_conversion_job
 from manual_resume_parser import parse_updated_content_to_resume, validate_updated_content
 from pdf_builder import build_resume_docx, is_pdf_conversion_ready
 
@@ -26,27 +37,23 @@ load_dotenv()
 # Configuration
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
-BASE_RESUME_PATH = "config/base_resume.json"
+BASE_RESUME_PATH = resource_path("config", "base_resume.json")
 # Default to local resumes folder in project directory
-DEFAULT_OUTPUT_ROOT = os.path.join(os.path.dirname(__file__), 'resumes')
+DEFAULT_OUTPUT_ROOT = str(default_output_dir())
 OUTPUT_ROOT = os.getenv("OUTPUT_ROOT", DEFAULT_OUTPUT_ROOT)
-SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'config', 'settings.json')
+SETTINGS_FILE = settings_path()
 
 def load_settings():
     """Load settings from config/settings.json, fall back to env var if missing."""
-    if os.path.exists(SETTINGS_FILE):
-        try:
-            with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Warning: Could not load settings file: {e}")
-    return {"output_directory": OUTPUT_ROOT}
+    loaded_settings = load_json_file(Path(SETTINGS_FILE), {"output_directory": OUTPUT_ROOT})
+    loaded_settings.setdefault("output_directory", OUTPUT_ROOT)
+    loaded_settings.setdefault("keep_docx", True)
+    loaded_settings.setdefault("profile", {})
+    return loaded_settings
 
 def save_settings(settings_dict):
     """Save settings to config/settings.json."""
-    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
-    with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(settings_dict, f, indent=2)
+    write_json_file(Path(SETTINGS_FILE), settings_dict)
 
 settings = load_settings()
 
@@ -103,12 +110,154 @@ def safe_folder_name(title: str, output_root: str = None) -> str:
     return name
 
 
+def display_folder_name(company_name: str, title: str, custom_folder: str) -> str:
+    if custom_folder:
+        return custom_folder
+    if company_name and title:
+        return f"{company_name} - {title}"
+    if company_name:
+        return company_name
+    return title or "Resume"
+
+
+def require_within_output(path_value: str, must_exist: bool = True) -> Path:
+    requested = Path(path_value).expanduser().resolve()
+    output_root = Path(settings["output_directory"]).expanduser().resolve()
+
+    if must_exist and not requested.exists():
+        raise FileNotFoundError(str(requested))
+
+    try:
+        requested.relative_to(output_root)
+    except ValueError as exc:
+        raise PermissionError("Requested path is outside the configured output directory") from exc
+
+    return requested
+
+
+def write_resume_artifacts(out_dir: Path, content: str, merged_resume: dict, metadata: dict) -> None:
+    (out_dir / "input.txt").write_text(content, encoding="utf-8")
+    (out_dir / "resume.json").write_text(json.dumps(merged_resume, indent=2), encoding="utf-8")
+    (out_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+
+def append_history(metadata: dict) -> None:
+    history_path = Path(settings["output_directory"]) / "history.json"
+    history = []
+    if history_path.exists():
+        try:
+            history = json.loads(history_path.read_text(encoding="utf-8"))
+        except Exception:
+            history = []
+    history.insert(0, metadata)
+    write_json_file(history_path, history[:200])
+
+
+def start_pdf_conversion(docx_path: Path, pdf_path: Path, status_path: Path) -> None:
+    if is_frozen() or os.getenv("RESUME_DESKTOP_MODE") == "1":
+        thread = threading.Thread(
+            target=run_conversion_job,
+            args=(docx_path, pdf_path, status_path),
+            kwargs={"timeout": 180, "delete_docx": False},
+            daemon=True,
+        )
+        thread.start()
+        return
+
+    script_dir = Path(__file__).resolve().parent
+    subprocess.Popen(
+        [
+            sys.executable,
+            str(script_dir / "convert_pdf_job.py"),
+            "--docx", str(docx_path),
+            "--pdf", str(pdf_path),
+            "--status", str(status_path),
+            "--timeout", "180",
+        ],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def profile_from_resume(resume: dict) -> dict:
+    contact = resume.get("contact", {})
+    return {
+        "name": resume.get("name", ""),
+        "contact": {
+            "location": contact.get("location", ""),
+            "phone": contact.get("phone", ""),
+            "email": contact.get("email", ""),
+        },
+        "projects": resume.get("projects", []),
+        "certifications": resume.get("certifications", []),
+    }
+
+
+def current_profile() -> dict:
+    profile = profile_from_resume(load_base_resume())
+    saved_profile = settings.get("profile") or {}
+
+    if saved_profile.get("name"):
+        profile["name"] = saved_profile["name"]
+
+    saved_contact = saved_profile.get("contact") or {}
+    profile["contact"].update({k: v for k, v in saved_contact.items() if v})
+
+    if isinstance(saved_profile.get("projects"), list):
+        profile["projects"] = saved_profile["projects"]
+
+    if isinstance(saved_profile.get("certifications"), list):
+        profile["certifications"] = saved_profile["certifications"]
+
+    return profile
+
+
+def apply_profile_overrides(resume: dict) -> dict:
+    profile = current_profile()
+    resume["name"] = profile.get("name") or resume.get("name", "")
+    resume["contact"] = {
+        **resume.get("contact", {}),
+        **(profile.get("contact") or {}),
+    }
+    resume["projects"] = profile.get("projects", resume.get("projects", []))
+    resume["certifications"] = profile.get("certifications", resume.get("certifications", []))
+    return resume
+
+
+def normalize_profile(payload: dict) -> dict:
+    contact = payload.get("contact") or {}
+    projects = payload.get("projects") if isinstance(payload.get("projects"), list) else []
+    certifications = payload.get("certifications") if isinstance(payload.get("certifications"), list) else []
+
+    normalized_projects = []
+    for project in projects:
+        if not isinstance(project, dict):
+            continue
+        name = str(project.get("name", "")).strip()
+        bullets = [str(item).strip() for item in project.get("bullets", []) if str(item).strip()]
+        if name:
+            normalized_projects.append({"name": name, "bullets": bullets})
+
+    return {
+        "name": str(payload.get("name", "")).strip(),
+        "contact": {
+            "location": str(contact.get("location", "")).strip(),
+            "phone": str(contact.get("phone", "")).strip(),
+            "email": str(contact.get("email", "")).strip(),
+        },
+        "projects": normalized_projects,
+        "certifications": [str(item).strip() for item in certifications if str(item).strip()],
+    }
+
+
 def get_conversion_status(status_path: str) -> dict:
     """Get PDF conversion status."""
-    if not os.path.exists(status_path):
+    status_file = require_within_output(status_path, must_exist=False)
+    if not status_file.exists():
         return {"state": "pending"}
 
-    with open(status_path, "r", encoding="utf-8") as f:
+    with open(status_file, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -148,7 +297,13 @@ def validate():
 @app.route("/api/settings", methods=["GET"])
 def get_settings():
     """Get current settings."""
-    return jsonify(settings)
+    ok, msg = get_pdf_conversion_status()
+    return jsonify({
+        **settings,
+        "settings_file": str(SETTINGS_FILE),
+        "pdf_conversion_ready": ok,
+        "pdf_conversion_status": msg,
+    })
 
 
 @app.route("/api/settings", methods=["POST"])
@@ -191,6 +346,7 @@ def update_settings():
 
         # Update in-memory settings and save to file
         settings["output_directory"] = output_directory
+        settings["keep_docx"] = bool(data.get("keep_docx", settings.get("keep_docx", True)))
         save_settings(settings)
 
         return jsonify({
@@ -203,6 +359,25 @@ def update_settings():
             "success": False,
             "error": str(e)
         }), 500
+
+
+@app.route("/api/profile", methods=["GET"])
+def get_profile():
+    """Get editable profile defaults used for every generated resume."""
+    return jsonify(current_profile())
+
+
+@app.route("/api/profile", methods=["POST"])
+def update_profile():
+    """Save editable profile defaults without changing the paste/generate flow."""
+    try:
+        data = request.get_json() or {}
+        profile = normalize_profile(data)
+        settings["profile"] = profile
+        save_settings(settings)
+        return jsonify({"success": True, "profile": current_profile()})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/generate", methods=["POST"])
@@ -223,15 +398,15 @@ def generate():
         # Parse content
         base_resume = load_base_resume()
         merged_resume = parse_updated_content_to_resume(content, base_resume)
+        merged_resume = apply_profile_overrides(merged_resume)
 
         # Create output directory
         title = merged_resume.get("title", "Resume")
+        company_name = data.get("company_name", "").strip()
         # Use custom folder name if provided, otherwise generate from title
         custom_folder = data.get("folder_name", "").strip()
-        if custom_folder:
-            folder_name = safe_folder_name(custom_folder, settings["output_directory"])
-        else:
-            folder_name = safe_folder_name(title, settings["output_directory"])
+        folder_source = display_folder_name(company_name, title, custom_folder)
+        folder_name = safe_folder_name(folder_source, settings["output_directory"])
         out_dir = Path(settings["output_directory"]) / folder_name
         out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -242,22 +417,24 @@ def generate():
         # Start background PDF conversion
         pdf_path = out_dir / "tharun manikonda resume.pdf"
         status_path = out_dir / "pdf_status.json"
+        metadata = {
+            "folder": folder_name,
+            "company_name": company_name,
+            "title": title,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "input_path": str(out_dir / "input.txt"),
+            "resume_json_path": str(out_dir / "resume.json"),
+            "metadata_path": str(out_dir / "metadata.json"),
+            "docx": str(docx_path),
+            "pdf": str(pdf_path),
+            "status_path": str(status_path),
+            "output_dir": str(out_dir),
+        }
+        write_resume_artifacts(out_dir, content, merged_resume, metadata)
+        append_history(metadata)
 
-        # Launch background job
-        script_dir = Path(__file__).resolve().parent
-        subprocess.Popen(
-            [
-                sys.executable,
-                str(script_dir / "convert_pdf_job.py"),
-                "--docx", str(docx_path),
-                "--pdf", str(pdf_path),
-                "--status", str(status_path),
-                "--timeout", "180",
-            ],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        # Launch background PDF conversion.
+        start_pdf_conversion(docx_path, pdf_path, status_path)
 
         return jsonify({
             "success": True,
@@ -266,6 +443,8 @@ def generate():
             "docx": str(docx_path),
             "pdf": str(pdf_path),
             "status_path": str(status_path),
+            "output_dir": str(out_dir),
+            "metadata": metadata,
         })
 
     except Exception as e:
@@ -309,11 +488,15 @@ def download():
         if not pdf_path:
             return jsonify({"error": "Missing 'path' parameter"}), 400
 
-        if not os.path.exists(pdf_path):
+        try:
+            resolved_path = require_within_output(pdf_path)
+        except FileNotFoundError:
             return jsonify({"error": "PDF not found"}), 404
+        except PermissionError as e:
+            return jsonify({"error": str(e)}), 403
 
-        filename = os.path.basename(pdf_path)
-        file_size = os.path.getsize(pdf_path)
+        filename = resolved_path.name
+        file_size = resolved_path.stat().st_size
         status = 200
         headers = {}
 
@@ -339,14 +522,14 @@ def download():
                 return Response(status=416, headers={"Content-Range": f"bytes */{file_size}"})
 
             length = end - start + 1
-            with open(pdf_path, "rb") as f:
+            with open(resolved_path, "rb") as f:
                 f.seek(start)
                 data = f.read(length)
 
             status = 206
             headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
         else:
-            with open(pdf_path, "rb") as f:
+            with open(resolved_path, "rb") as f:
                 data = f.read()
             length = file_size
 
@@ -372,6 +555,52 @@ def download():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/open-folder", methods=["POST"])
+def open_folder():
+    """Open a generated resume folder in the local file manager."""
+    try:
+        data = request.get_json() or {}
+        folder_path = data.get("path", "").strip()
+        if not folder_path:
+            return jsonify({"success": False, "error": "Missing folder path"}), 400
+        folder = require_within_output(folder_path)
+        if folder.is_file():
+            folder = folder.parent
+        open_path(folder)
+        return jsonify({"success": True})
+    except FileNotFoundError:
+        return jsonify({"success": False, "error": "Folder not found"}), 404
+    except PermissionError as e:
+        return jsonify({"success": False, "error": str(e)}), 403
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/select-output-directory", methods=["POST"])
+def select_output_directory():
+    """Choose an output directory with a native local dialog when available."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        selected = filedialog.askdirectory(initialdir=settings.get("output_directory") or str(default_output_dir()))
+        root.destroy()
+
+        if not selected:
+            return jsonify({"success": False, "cancelled": True})
+
+        output_directory = str(Path(selected).expanduser().resolve())
+        Path(output_directory).mkdir(parents=True, exist_ok=True)
+        settings["output_directory"] = output_directory
+        save_settings(settings)
+        return jsonify({"success": True, "output_directory": output_directory})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/health", methods=["GET"])
 def health():
     """Health check."""
@@ -380,6 +609,9 @@ def health():
         "status": "ok",
         "pdf_conversion_ready": ok,
         "pdf_conversion_status": msg,
+        "output_directory": settings.get("output_directory"),
+        "output_directory_writable": os.access(settings.get("output_directory", ""), os.W_OK),
+        "settings_file": str(SETTINGS_FILE),
         "timestamp": datetime.now().isoformat()
     })
 
