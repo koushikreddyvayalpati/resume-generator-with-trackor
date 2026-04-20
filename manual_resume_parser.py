@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import re
 from typing import Any
@@ -63,20 +65,31 @@ def _remove_unknown_sections(text: str) -> str:
     return "\n".join(result)
 
 
+def _marker_pattern(marker: str) -> re.Pattern:
+    """Build a case-insensitive section marker pattern.
+
+    The UI examples often use all-caps section headers, but pasted LLM output
+    commonly uses title case and sometimes prefixes experience with "Updated".
+    """
+    normalized = marker.rstrip(":").strip()
+    prefix = r"(?:UPDATED\s+)?" if normalized in {"PROFESSIONAL EXPERIENCE", "MODIFIED EXPERIENCE"} else ""
+    return re.compile(rf"(?im)^\s*{prefix}{re.escape(normalized)}\s*:?\s*$")
+
+
 def _between(text: str, start: str, end: str | None) -> str:
-    """Extract text between two markers."""
-    start_idx = text.find(start)
-    if start_idx == -1:
+    """Extract text between two section markers."""
+    start_match = _marker_pattern(start).search(text)
+    if not start_match:
         return ""
-    start_idx += len(start)
+    start_idx = start_match.end()
     if end is None:
         extracted = text[start_idx:].strip()
     else:
-        end_idx = text.find(end, start_idx)
-        if end_idx == -1:
+        end_match = _marker_pattern(end).search(text, start_idx)
+        if not end_match:
             extracted = text[start_idx:].strip()
         else:
-            extracted = text[start_idx:end_idx].strip()
+            extracted = text[start_idx:end_match.start()].strip()
 
     # For sections, remove extraneous content but preserve structure
     if end is not None:  # For intermediate sections
@@ -167,9 +180,14 @@ def _parse_experience_titles_and_bullets(text: str) -> dict[str, dict[str, Any]]
                 first_line = False
                 # Check if this line has pipes (Format B: "Company | Title | Dates")
                 if "|" in cleaned:
-                    # Extract the title part (second element between pipes)
-                    parts = cleaned.split("|")
-                    title_part = parts[1].strip() if len(parts) > 1 else parts[0].strip()
+                    parts = [part.strip() for part in cleaned.split("|")]
+                    if not parts[0]:
+                        # Company/location line after the company name was already matched,
+                        # e.g. "| CA, USA". Keep looking for the actual role line.
+                        first_line = True
+                        continue
+                    # Extract title from either "Company | Title | Dates" or "Title | Dates".
+                    title_part = parts[1] if len(parts) >= 3 else parts[0]
                     title = _clean_title(title_part)
                 else:
                     # Format A: just a title, no pipes

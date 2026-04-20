@@ -36,13 +36,22 @@ const removeUnknownSections = (text) => {
     return result.join("\n");
 };
 
+const markerPattern = (marker) => {
+    const normalized = marker.replace(/:$/, "").trim();
+    const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const prefix = ["PROFESSIONAL EXPERIENCE", "MODIFIED EXPERIENCE"].includes(normalized)
+        ? "(?:UPDATED\\s+)?"
+        : "";
+    return new RegExp("^\\s*" + prefix + escaped + "\\s*:?\\s*$", "im");
+};
+
 const between = (text, start, end) => {
-    const startIdx = text.indexOf(start);
-    if (startIdx === -1) return "";
-    let extracted = text.substring(startIdx + start.length);
+    const startMatch = text.match(markerPattern(start));
+    if (!startMatch) return "";
+    let extracted = text.substring(startMatch.index + startMatch[0].length);
     if (end) {
-        const endIdx = extracted.indexOf(end);
-        if (endIdx !== -1) extracted = extracted.substring(0, endIdx);
+        const endMatch = extracted.match(markerPattern(end));
+        if (endMatch) extracted = extracted.substring(0, endMatch.index);
     }
     extracted = extracted.trim();
     if (end) extracted = removeUnknownSections(extracted);
@@ -100,8 +109,12 @@ const parseExperienceTitlesAndBullets = (text) => {
             if (!title && firstLine) {
                 firstLine = false;
                 if (cleaned.includes("|")) {
-                    const parts = cleaned.split("|");
-                    const titlePart = parts.length > 1 ? parts[1].trim() : parts[0].trim();
+                    const parts = cleaned.split("|").map(part => part.trim());
+                    if (!parts[0]) {
+                        firstLine = true;
+                        continue;
+                    }
+                    const titlePart = parts.length >= 3 ? parts[1] : parts[0];
                     title = cleanTitle(titlePart);
                 } else {
                     title = cleanTitle(cleaned);
