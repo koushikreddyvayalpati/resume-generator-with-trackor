@@ -25,7 +25,6 @@ from desktop_runtime import (
     settings_path,
     write_json_file,
 )
-from convert_pdf_job import run_conversion_job
 from manual_resume_parser import parse_updated_content_to_resume, validate_updated_content
 from pdf_builder import build_resume_docx, is_pdf_conversion_ready
 
