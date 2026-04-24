@@ -181,13 +181,19 @@ def _parse_experience_titles_and_bullets(text: str) -> dict[str, dict[str, Any]]
                 # Check if this line has pipes (Format B: "Company | Title | Dates")
                 if "|" in cleaned:
                     parts = [part.strip() for part in cleaned.split("|")]
+                    non_empty_parts = [part for part in parts if part]
                     if not parts[0]:
-                        # Company/location line after the company name was already matched,
-                        # e.g. "| CA, USA". Keep looking for the actual role line.
-                        first_line = True
-                        continue
-                    # Extract title from either "Company | Title | Dates" or "Title | Dates".
-                    title_part = parts[1] if len(parts) >= 3 else parts[0]
+                        # After matching the company name, the remainder can be either
+                        # "| Location" or "| Title | Dates". Treat two or more non-empty
+                        # segments as a title/date line; otherwise keep scanning.
+                        if len(non_empty_parts) >= 2:
+                            title_part = non_empty_parts[0]
+                        else:
+                            first_line = True
+                            continue
+                    else:
+                        # Extract title from either "Company | Title | Dates" or "Title | Dates".
+                        title_part = parts[1] if len(parts) >= 3 else parts[0]
                     title = _clean_title(title_part)
                 else:
                     # Format A: just a title, no pipes

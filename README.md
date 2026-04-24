@@ -1,8 +1,8 @@
-# 📄 Resume Generator
+# Resume Generator
 
-A modern, Flask-based resume generator with real-time preview, PDF export, and customizable output directory settings.
+A Flask-based resume generator with real-time preview and PDF export.
 
-## ✨ Features
+## Features
 
 - **Real-time Preview** — See parsed resume as you type
 - **Auto-Validation** — Instant feedback on resume content
@@ -12,48 +12,28 @@ A modern, Flask-based resume generator with real-time preview, PDF export, and c
 - **Modern UI** — Clean, responsive design with dark mode
 - **Hardcoded Company Data** — Consistent work history across exports
 
-## 🚀 Quick Start (One Command)
+## Quick Start
 
-### macOS / Linux
 ```bash
 ./setup.sh
 ```
 
-### Windows (Batch)
-```cmd
-setup.bat
-```
-
-### Windows (PowerShell)
-```powershell
-.\setup.ps1
-```
-
-Or manually:
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python app.py
-```
-
 The script will:
-1. ✅ Check for Python 3
-2. ✅ Create a virtual environment
-3. ✅ Install all dependencies
-4. ✅ Create .env file if needed
-5. ✅ Start the app at `http://127.0.0.1:5001`
+1. Check for Python 3
+2. Create a virtual environment
+3. Install all dependencies
+4. Create `.env` if needed
+5. Start the app at `http://127.0.0.1:5001`
 
-## 📋 Requirements
+## Requirements
 
 - **Python 3.8+** — Download from https://www.python.org
 - **Flask 2.0+** — Installed automatically
 - **LibreOffice** (for PDF conversion)
   - macOS: `brew install libreoffice`
-  - Windows: Download from https://www.libreoffice.org/download
   - Linux: `apt-get install libreoffice` or `yum install libreoffice`
 
-## 🎯 How to Use
+## How to Use
 
 1. **Paste Resume Content** — Use the format below
 2. **Click Settings (⚙)** — Configure output directory
@@ -83,7 +63,7 @@ Job Title
 [Repeat for other companies]
 ```
 
-## ⚙️ Settings
+## Settings
 
 Click the **⚙ Settings** button in the header to:
 - **Browse** — Open file picker to select output directory
@@ -92,7 +72,7 @@ Click the **⚙ Settings** button in the header to:
 
 Settings are stored in `config/settings.json`
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 resume-tool/
@@ -111,7 +91,7 @@ resume-tool/
 └── README.md               # This file
 ```
 
-## 🔧 API Endpoints
+## API Endpoints
 
 - `GET /` — Main UI
 - `POST /api/validate` — Validate resume content
@@ -122,7 +102,7 @@ resume-tool/
 - `GET /api/status` — Check PDF conversion status
 - `GET /api/download` — Download generated PDF
 
-## 💾 Hardcoded Company Data
+## Hardcoded Company Data
 
 Your work history is automatically included:
 - McKinsey & Company | May 2025 – Present
@@ -130,17 +110,11 @@ Your work history is automatically included:
 - KPMG | September 2021 – July 2022
 - Trigent Software | March 2020 – August 2021
 
-## 🛠️ Troubleshooting
-
-### All Platforms
+## Troubleshooting
 
 **Port already in use:**
 ```bash
-# macOS / Linux
 FLASK_PORT=5002 python3 app.py
-
-# Windows (Command Prompt)
-set FLASK_PORT=5002 && python app.py
 ```
 
 **PDF conversion not working:**
@@ -148,37 +122,10 @@ set FLASK_PORT=5002 && python app.py
 - Make sure it's in your system PATH
 - Restart the app after installation
 
-### Windows-Specific
-
-**setup.bat won't run:**
-- Right-click `setup.bat` → Run as Administrator
-- Or use PowerShell: `.\setup.ps1`
-
-**PowerShell execution policy error:**
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.\setup.ps1
-```
-
-**Virtual environment issues:**
-```cmd
-rmdir /s venv
-setup.bat
-```
-
-**Python not found:**
-- Ensure Python is installed and added to PATH
-- Run `python --version` to verify
-- Restart your terminal/command prompt
-
-## 📝 License
+## License
 
 MIT
 
-## 🤝 Contributing
+## Contributing
 
 Feel free to fork, modify, and share with others!
-
----
-
-**Start now:** `./setup.sh` 🚀

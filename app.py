@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from desktop_runtime import (
     default_output_dir,
-    is_frozen,
     load_json_file,
     open_path,
     resource_path,
@@ -135,37 +134,9 @@ def require_within_output(path_value: str, must_exist: bool = True) -> Path:
     return requested
 
 
-def write_resume_artifacts(out_dir: Path, content: str, merged_resume: dict, metadata: dict) -> None:
-    (out_dir / "input.txt").write_text(content, encoding="utf-8")
-    (out_dir / "resume.json").write_text(json.dumps(merged_resume, indent=2), encoding="utf-8")
-    (out_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-
-
-def append_history(metadata: dict) -> None:
-    history_path = Path(settings["output_directory"]) / "history.json"
-    history = []
-    if history_path.exists():
-        try:
-            history = json.loads(history_path.read_text(encoding="utf-8"))
-        except Exception:
-            history = []
-    history.insert(0, metadata)
-    write_json_file(history_path, history[:200])
-
-
 def start_pdf_conversion(docx_path: Path, pdf_path: Path, status_path: Path) -> None:
-    if is_frozen() or os.getenv("RESUME_DESKTOP_MODE") == "1":
-        thread = threading.Thread(
-            target=run_conversion_job,
-            args=(docx_path, pdf_path, status_path),
-            kwargs={"timeout": 180, "delete_docx": False},
-            daemon=True,
-        )
-        thread.start()
-        return
-
     script_dir = Path(__file__).resolve().parent
-    subprocess.Popen(
+    proc = subprocess.Popen(
         [
             sys.executable,
             str(script_dir / "convert_pdf_job.py"),
@@ -173,11 +144,14 @@ def start_pdf_conversion(docx_path: Path, pdf_path: Path, status_path: Path) -> 
             "--pdf", str(pdf_path),
             "--status", str(status_path),
             "--timeout", "180",
+            "--delete-docx",
         ],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
+        start_new_session=(os.name != "nt"),
     )
+    threading.Thread(target=proc.wait, daemon=True).start()
 
 
 def profile_from_resume(resume: dict) -> dict:
@@ -319,15 +293,10 @@ def update_settings():
                 "error": "Output directory cannot be empty"
             }), 400
 
-        # Check if path is absolute (Unix/macOS or Windows)
-        is_absolute = (output_directory.startswith('/') or
-                      (len(output_directory) > 2 and output_directory[1:3] == ':\\') or
-                      (len(output_directory) > 2 and output_directory[1] == ':'))
-
-        if not is_absolute:
+        if not Path(output_directory).is_absolute():
             return jsonify({
                 "success": False,
-                "error": "Path must be absolute.\nExamples:\n- Mac/Linux: /Users/yourname/Documents/resumes\n- Windows: C:\\Users\\yourname\\Documents\\resumes"
+                "error": "Path must be absolute.\nExample:\n/Users/yourname/Documents/resumes"
             }), 400
 
         # Try to create the directory if it doesn't exist
@@ -437,16 +406,11 @@ def generate():
             "identity": identity,
             "title": title,
             "created_at": datetime.now(timezone.utc).isoformat(),
-            "input_path": str(out_dir / "input.txt"),
-            "resume_json_path": str(out_dir / "resume.json"),
-            "metadata_path": str(out_dir / "metadata.json"),
             "docx": str(docx_path),
             "pdf": str(pdf_path),
             "status_path": str(status_path),
             "output_dir": str(out_dir),
         }
-        write_resume_artifacts(out_dir, content, merged_resume, metadata)
-        append_history(metadata)
 
         # Launch background PDF conversion.
         start_pdf_conversion(docx_path, pdf_path, status_path)

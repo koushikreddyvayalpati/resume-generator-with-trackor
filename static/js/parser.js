@@ -110,11 +110,18 @@ const parseExperienceTitlesAndBullets = (text) => {
                 firstLine = false;
                 if (cleaned.includes("|")) {
                     const parts = cleaned.split("|").map(part => part.trim());
+                    const nonEmptyParts = parts.filter(Boolean);
+                    let titlePart = "";
                     if (!parts[0]) {
-                        firstLine = true;
-                        continue;
+                        if (nonEmptyParts.length >= 2) {
+                            titlePart = nonEmptyParts[0];
+                        } else {
+                            firstLine = true;
+                            continue;
+                        }
+                    } else {
+                        titlePart = parts.length >= 3 ? parts[1] : parts[0];
                     }
-                    const titlePart = parts.length >= 3 ? parts[1] : parts[0];
                     title = cleanTitle(titlePart);
                 } else {
                     title = cleanTitle(cleaned);

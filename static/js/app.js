@@ -311,12 +311,14 @@ class ResumeGenerator {
 
         // Show preview immediately if there's content
         if (content) {
+            this.showTab("parsed");
             // Load preview immediately
             this.loadPreview(content);
 
             // Debounce validation
             this.validationTimeout = setTimeout(() => this.validate(), 500);
         } else {
+            this.showTab("parsed");
             this.validationDisplay.style.display = "none";
             this.generateBtn.disabled = true;
             document.getElementById("previewContainer").style.display = "none";

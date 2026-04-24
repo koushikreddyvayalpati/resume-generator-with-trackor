@@ -3,10 +3,9 @@ import subprocess
 import os
 import platform
 import shutil
-import sys
+import signal
 import tempfile
 from pathlib import Path
-from urllib.parse import quote
 
 from dotenv import load_dotenv
 from docx import Document
@@ -18,18 +17,8 @@ from docx.oxml.ns import qn
 # Load environment variables from .env file
 load_dotenv()
 
-
 def _app_base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
-
-
-def _resource_path(*parts: str) -> Path:
-    bundle_root = getattr(sys, "_MEIPASS", None)
-    if bundle_root:
-        return Path(bundle_root).joinpath(*parts)
-    return _app_base_dir().joinpath(*parts)
 
 
 def get_soffice_path():
@@ -43,26 +32,11 @@ def get_soffice_path():
     if env_path:
         paths_to_try.append(env_path)
 
-    base_dir = _app_base_dir()
-    resource_dir = _resource_path()
-
     if system == "Darwin":  # macOS
         paths_to_try += [
             "/opt/homebrew/bin/soffice",
             "/usr/local/bin/soffice",
             "/Applications/LibreOffice.app/Contents/MacOS/soffice"
-        ]
-    elif system == "Windows":
-        paths_to_try += [
-            str(base_dir / "libreoffice" / "program" / "soffice.exe"),
-            str(base_dir / "LibreOfficePortable" / "App" / "libreoffice" / "program" / "soffice.exe"),
-            str(base_dir / "LibreOffice" / "program" / "soffice.exe"),
-            str(resource_dir / "libreoffice" / "program" / "soffice.exe"),
-            str(resource_dir / "LibreOfficePortable" / "App" / "libreoffice" / "program" / "soffice.exe"),
-            "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
-            "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
-            "C:\\Program Files\\LibreOffice\\program",
-            "C:\\Program Files (x86)\\LibreOffice\\program",
         ]
     elif system == "Linux":
         paths_to_try = [
@@ -75,7 +49,7 @@ def get_soffice_path():
         try:
             candidate = Path(path)
             if candidate.is_dir():
-                executable = candidate / ("soffice.exe" if system == "Windows" else "soffice")
+                executable = candidate / "soffice"
                 if executable.exists():
                     return str(executable)
             elif candidate.exists():
@@ -95,7 +69,7 @@ def get_soffice_path():
 
 # Configuration - use environment variables with fallback defaults
 # Default to local resumes folder in project directory
-DEFAULT_TEMPLATE = str(_resource_path('resumes', 'Tharun Manikonda Resume.docx'))
+DEFAULT_TEMPLATE = str(_app_base_dir() / 'resumes' / 'Tharun Manikonda Resume.docx')
 TEMPLATE_PATH = os.getenv("RESUME_TEMPLATE_PATH", DEFAULT_TEMPLATE)
 BULLET = "●"
 TEXT_W = 7.884   # usable width (A4 8.278" − 2 × 0.197")
@@ -432,17 +406,26 @@ def is_pdf_conversion_ready() -> tuple[bool, str]:
     if not soffice_path:
         return False, "LibreOffice not installed"
 
+    proc = None
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             [soffice_path, "--version"],
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=15
+            start_new_session=(os.name != "nt"),
         )
-        if result.returncode == 0:
-            return True, f"LibreOffice ready ({result.stdout.strip()})"
-        return False, "LibreOffice not responding"
+        stdout, stderr = proc.communicate(timeout=5)
+        if proc.returncode == 0:
+            return True, f"LibreOffice ready ({stdout.strip()})"
+        return False, f"LibreOffice not responding: {stderr.strip()}"
     except subprocess.TimeoutExpired:
+        if proc is not None:
+            if os.name != "nt":
+                os.killpg(proc.pid, signal.SIGKILL)
+            else:
+                proc.kill()
+            proc.communicate()
         return False, "LibreOffice version check timed out"
     except Exception as e:
         return False, f"Error checking LibreOffice: {str(e)}"
@@ -458,7 +441,7 @@ def _convert_docx_to_pdf_via_libreoffice(docx_path: str, output_path: str, timeo
         print(f"  [PDF] Detected LibreOffice path: {soffice_path}")
 
         if not soffice_path:
-            raise RuntimeError("LibreOffice not found. Checked paths: C:\\Program Files\\LibreOffice\\program\\soffice.exe, C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe")
+            raise RuntimeError("LibreOffice not found")
 
         # Verify DOCX file exists
         if not os.path.exists(docx_path):
@@ -477,43 +460,53 @@ def _convert_docx_to_pdf_via_libreoffice(docx_path: str, output_path: str, timeo
             raise RuntimeError(f"Output directory does not exist: {output_dir}")
         print(f"  [PDF] Output directory verified")
 
-        # Use LibreOffice headless mode to convert
-        user_installation_dir = Path(tempfile.gettempdir()) / "resume-tool-libreoffice-profile"
-        user_installation_dir.mkdir(parents=True, exist_ok=True)
-        if platform.system() == "Windows":
-            profile_uri = "file:///" + quote(str(user_installation_dir).replace("\\", "/"))
-        else:
-            profile_uri = "file://" + quote(str(user_installation_dir))
-
+        # Use an isolated LibreOffice profile for each conversion. Shared
+        # headless profiles can lock up under concurrent requests.
+        user_installation_dir = Path(tempfile.mkdtemp(prefix="resume-tool-lo-"))
         cmd = [
             soffice_path,
             "--headless",
             "--nologo",
             "--nofirststartwizard",
             "--nolockcheck",
-            f"-env:UserInstallation={profile_uri}",
+            f"-env:UserInstallation={user_installation_dir.as_uri()}",
             "--convert-to", "pdf",
             "--outdir", output_dir,
             docx_path
         ]
 
         print(f"  [PDF] Running command: {' '.join(cmd)}")
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout_seconds,
-            env=os.environ.copy()
+            env=os.environ.copy(),
+            start_new_session=(os.name != "nt"),
         )
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired as e:
+            if os.name != "nt":
+                os.killpg(proc.pid, signal.SIGKILL)
+            else:
+                proc.kill()
+            stdout, stderr = proc.communicate()
+            raise RuntimeError(
+                f"LibreOffice conversion timed out after {timeout_seconds} seconds. "
+                f"STDOUT: {stdout} STDERR: {stderr} Error: {str(e)}"
+            )
+        finally:
+            shutil.rmtree(user_installation_dir, ignore_errors=True)
 
-        print(f"  [PDF] Command return code: {result.returncode}")
-        if result.stdout:
-            print(f"  [PDF] STDOUT: {result.stdout}")
-        if result.stderr:
-            print(f"  [PDF] STDERR: {result.stderr}")
+        print(f"  [PDF] Command return code: {proc.returncode}")
+        if stdout:
+            print(f"  [PDF] STDOUT: {stdout}")
+        if stderr:
+            print(f"  [PDF] STDERR: {stderr}")
 
-        if result.returncode != 0:
-            raise RuntimeError(f"LibreOffice command failed with code {result.returncode}. STDERR: {result.stderr}")
+        if proc.returncode != 0:
+            raise RuntimeError(f"LibreOffice command failed with code {proc.returncode}. STDERR: {stderr}")
 
         # LibreOffice creates PDF with same name as DOCX but .pdf extension
         expected_pdf = os.path.join(output_dir, os.path.basename(docx_path).replace('.docx', '.pdf'))
