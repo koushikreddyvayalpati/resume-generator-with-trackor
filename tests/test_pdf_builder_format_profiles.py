@@ -58,4 +58,4 @@ def test_gmail_format_profile_applies_docx_layout(tmp_path):
     assert_near(section.bottom_margin, Inches(0.25))
     assert_near(section.left_margin, Inches(0.28))
     assert_near(section.right_margin, Inches(0.28))
-    assert doc.styles["Normal"].font.name == "Calibri"
+    assert doc.styles["Normal"].font.name == "Times New Roman"

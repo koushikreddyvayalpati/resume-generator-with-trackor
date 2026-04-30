@@ -89,7 +89,7 @@ FORMAT_PROFILES = {
         "text_width": TEXT_W,
     },
     "gmail": {
-        "font_name": "Calibri",
+        "font_name": None,
         "margins": {
             "top": 0.25,
             "bottom": 0.25,

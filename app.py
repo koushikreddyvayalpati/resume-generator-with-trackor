@@ -340,6 +340,28 @@ def normalize_skill_dedupe_key(item: str) -> str:
     return text
 
 
+def skill_item_looks_like_model_meta(item: str) -> bool:
+    text = normalize_skill_item_text(item).lower()
+    if not text:
+        return False
+
+    meta_markers = (
+        "sorry",
+        "please output",
+        "corrected json",
+        "however",
+        "note:",
+        "i'm going to",
+        "i will revise",
+        "remove uncertain",
+        "must return valid json",
+        "adhere to rules",
+        "trusted items",
+        "interruption",
+    )
+    return any(marker in text for marker in meta_markers)
+
+
 def normalize_updated_skills(skills_payload: list[dict]) -> list[dict]:
     if not isinstance(skills_payload, list):
         return []
@@ -358,6 +380,8 @@ def normalize_updated_skills(skills_payload: list[dict]) -> list[dict]:
         for raw_item in entry.get("items", []):
             item = normalize_skill_item_text(raw_item)
             if not item:
+                continue
+            if skill_item_looks_like_model_meta(item):
                 continue
             key = normalize_skill_dedupe_key(item)
             if not key or key in local_seen or key in global_seen:
@@ -1143,8 +1167,10 @@ def validate_model_payload(model_payload: dict) -> list[str]:
         if len(items) < 2:
             issues.append(f"Skills category '{category}' must contain at least 2 skills.")
         for item in items:
-            if ":" in item or len(item) > 60:
+            if ":" in item or len(item) > 60 or "?" in item:
                 issues.append(f"Skill item '{item}' in '{category}' is malformed.")
+            if skill_item_looks_like_model_meta(item):
+                issues.append(f"Skill item '{item}' in '{category}' contains model meta text.")
             all_skill_items.append(item.lower())
 
     if len(set(all_skill_items)) < max(len(all_skill_items) - 3, 1):
@@ -1209,6 +1235,53 @@ def validate_model_payload(model_payload: dict) -> list[str]:
 
         if count_words(" ".join(bullets[:2])) and not any(term in " ".join(bullets[:2]).lower() for term in SYSTEM_SIGNAL_TERMS):
             issues.append(f"{blueprint['company']} opening bullets do not establish the system story clearly.")
+
+    return issues
+
+
+def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[str]:
+    issues: list[str] = []
+    title = str(core_payload.get("updated_title", "")).strip()
+    summary = str(core_payload.get("updated_summary", "")).strip()
+    skills = core_payload.get("updated_skills") or []
+
+    if not title:
+        issues.append("Updated title is empty.")
+    title_word_count = count_words(title)
+    if title and not (TITLE_WORD_MIN <= title_word_count <= TITLE_WORD_MAX):
+        issues.append(f"Updated title must be {TITLE_WORD_MIN}-{TITLE_WORD_MAX} words; got {title_word_count}.")
+
+    summary_word_count = count_words(summary)
+    if not summary or not (SUMMARY_WORD_MIN <= summary_word_count <= SUMMARY_WORD_MAX):
+        issues.append(f"Updated summary must be {SUMMARY_WORD_MIN}-{SUMMARY_WORD_MAX} words; got {summary_word_count}.")
+
+    if len(skills) < 6:
+        issues.append("Updated skills must contain at least 6 categories.")
+
+    seen_categories: set[str] = set()
+    for entry in skills:
+        category = str(entry.get("category", "")).strip()
+        items = [str(item).strip() for item in entry.get("items", []) if str(item).strip()]
+        if not category:
+            issues.append("A skills category is empty.")
+            continue
+        if category in seen_categories:
+            issues.append(f"Duplicate skills category: {category}.")
+        seen_categories.add(category)
+        if category not in ALLOWED_SKILL_CATEGORIES:
+            issues.append(f"Unsupported skills category: {category}.")
+        if len(items) < 2:
+            issues.append(f"Skills category '{category}' must contain at least 2 skills.")
+        for item in items:
+            if ":" in item or len(item) > 60 or "?" in item:
+                issues.append(f"Skill item '{item}' in '{category}' is malformed.")
+            if skill_item_looks_like_model_meta(item):
+                issues.append(f"Skill item '{item}' in '{category}' contains model meta text.")
+
+    if not analysis_payload.get("core_problem"):
+        issues.append("Analysis is missing core_problem.")
+    if not analysis_payload.get("target_role"):
+        issues.append("Analysis is missing target_role.")
 
     return issues
 
@@ -1405,6 +1478,15 @@ def call_openai_resume_engine(
         ) from exc
     timing["resume_ms"] = int((time.perf_counter() - started) * 1000)
     timing["total_ms"] = timing.get("analysis_ms", 0) + timing["resume_ms"]
+
+    issues = validate_model_payload({"analysis": analysis_payload, "resume": parsed_resume})
+    if issues:
+        raise AIStageError(
+            "resume_generation",
+            "Resume generation failed validation: " + " | ".join(issues[:3]),
+            analysis=analysis_payload,
+            timing=timing,
+        )
 
     return {"analysis": analysis_payload, "resume": parsed_resume, "timing": timing}
 
@@ -1951,6 +2033,15 @@ def generate_ai_core():
             raise AIStageError("core_generation", f"Core resume generation failed: {exc}", analysis=analysis_payload) from exc
         timing = {"core_ms": int((time.perf_counter() - started) * 1000)}
         timing["total_ms"] = timing["core_ms"]
+
+        issues = validate_core_payload(core_payload, analysis_payload)
+        if issues:
+            raise AIStageError(
+                "core_generation",
+                "Core resume generation failed validation: " + " | ".join(issues[:3]),
+                analysis=analysis_payload,
+                timing=timing,
+            )
 
         core_content = format_core_resume_text(core_payload)
         session["core_resume"] = core_payload

@@ -9,6 +9,19 @@ class ResumeGenerator {
         this.companyNameInput = document.getElementById("companyName");
         this.folderNameInput = document.getElementById("folderName");
         this.generateBtn = document.getElementById("generateBtn");
+        this.jobDescriptionInput = document.getElementById("jobDescriptionInput");
+        this.aiInstructionInput = document.getElementById("aiInstructionInput");
+        this.aiGenerateBtn = document.getElementById("aiGenerateBtn");
+        this.aiResetBtn = document.getElementById("aiResetBtn");
+        this.jdVoiceBtn = document.getElementById("jdVoiceBtn");
+        this.refineVoiceBtn = document.getElementById("refineVoiceBtn");
+        this.aiStatusBadge = document.getElementById("aiStatusBadge");
+        this.aiMemoryBadge = document.getElementById("aiMemoryBadge");
+        this.aiError = document.getElementById("aiError");
+        this.aiResultArea = document.getElementById("aiResultArea");
+        this.aiThread = document.getElementById("aiThread");
+        this.generatedArtifact = document.getElementById("generatedArtifact");
+        this.generatedContentEditor = document.getElementById("generatedContentEditor");
         this.downloadBtn = document.getElementById("downloadBtn");
         this.openFolderBtn = document.getElementById("openFolderBtn");
         this.refreshBtn = document.getElementById("refreshBtn");
@@ -87,9 +100,15 @@ class ResumeGenerator {
 
         // Event listeners
         this.contentInput.addEventListener("input", () => this.onContentChange());
+        this.jobDescriptionInput.addEventListener("input", () => this.onJobDescriptionChange());
         this.contentInput.addEventListener("keydown", (e) => this.handleContentKeydown(e));
+        this.generatedContentEditor.addEventListener("input", () => this.onGeneratedContentEdit());
         this.folderNameInput.addEventListener("keydown", (e) => this.handleFolderKeydown(e));
         this.generateBtn.addEventListener("click", () => this.generate());
+        this.aiGenerateBtn.addEventListener("click", () => this.generateFromJobDescription());
+        this.aiResetBtn.addEventListener("click", () => this.resetAiMemory());
+        this.jdVoiceBtn.addEventListener("click", () => this.startVoiceInput(this.jobDescriptionInput, this.jdVoiceBtn));
+        this.refineVoiceBtn.addEventListener("click", () => this.startVoiceInput(this.aiInstructionInput, this.refineVoiceBtn));
         this.downloadBtn.addEventListener("click", () => this.download());
         this.openFolderBtn.addEventListener("click", () => this.openGeneratedFolder());
         this.refreshBtn.addEventListener("click", () => this.checkStatus());
@@ -150,9 +169,14 @@ class ResumeGenerator {
         this.statusCheckInterval = null;
         this.validationTimeout = null;
         this.isGenerating = false;
+        this.isAiGenerating = false;
+        this.aiSessionId = null;
+        this.lastGeneratedJobDescription = "";
+        this.speechRecognition = null;
 
         // Initial state
         this.showState("initial");
+        this.loadAiStatus();
     }
 
     async loadBaseResume() {
@@ -299,6 +323,234 @@ class ResumeGenerator {
         this.pdfTabBtn.classList.toggle("active", showPdf);
         this.parsedTab.classList.toggle("active", !showPdf);
         this.pdfTab.classList.toggle("active", showPdf);
+    }
+
+    async loadAiStatus() {
+        try {
+            const response = await fetch("/api/ai/status");
+            const data = await response.json();
+            this.aiStatusBadge.textContent = data.ready ? "AI Ready" : "AI Error";
+            this.aiStatusBadge.classList.toggle("status-ok", !!data.ready);
+            this.aiStatusBadge.classList.toggle("status-error", !data.ready);
+            this.updateAiMemoryBadge(0, data.memory_limit || 2);
+        } catch (error) {
+            console.error("AI status error:", error);
+            this.aiStatusBadge.textContent = "AI Error";
+            this.aiStatusBadge.classList.add("status-error");
+        }
+    }
+
+    updateAiMemoryBadge(count = 0, limit = 2) {
+        this.aiMemoryBadge.textContent = `Memory ${count}/${limit}`;
+        this.aiMemoryBadge.style.display = count > 0 ? "inline-block" : "none";
+    }
+
+    onJobDescriptionChange() {
+        const current = this.jobDescriptionInput.value.trim();
+        if (this.lastGeneratedJobDescription && current !== this.lastGeneratedJobDescription) {
+            this.aiSessionId = null;
+            this.updateAiMemoryBadge(0, 2);
+        }
+    }
+
+    showAiError(message) {
+        if (!message) {
+            this.aiError.style.display = "none";
+            this.aiError.textContent = "";
+            return;
+        }
+        this.aiError.style.display = "block";
+        this.aiError.textContent = message;
+    }
+
+    escapeHtml(value) {
+        return (value || "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
+    renderThreadEmpty() {
+        this.aiThread.innerHTML = '<div class="thread-empty">Paste a JD and generate. The soul of the role and the generated resume content will show here.</div>';
+    }
+
+    appendThreadCard(kind, title, bodyHtml) {
+        if (!this.aiThread) return;
+        const empty = this.aiThread.querySelector(".thread-empty");
+        if (empty) empty.remove();
+
+        const card = document.createElement("div");
+        card.className = `thread-card ${kind}`;
+        card.innerHTML = `
+            <div class="thread-card-header">${kind === "user" ? "You" : "Resume Engine"}</div>
+            <div class="thread-card-body">
+                <span class="thread-card-title">${this.escapeHtml(title)}</span>
+                ${bodyHtml}
+            </div>
+        `;
+        this.aiThread.appendChild(card);
+        this.aiThread.scrollTop = this.aiThread.scrollHeight;
+    }
+
+    renderSoulMessage(analysis) {
+        if (!analysis) return;
+        const keySignals = (analysis.core_skills || []).slice(0, 6);
+        const pivot = (analysis.build_strategy || []).slice(0, 3);
+        const body = `
+            <div><strong>Soul of the role:</strong> ${this.escapeHtml(analysis.core_problem || "")}</div>
+            <div style="margin-top:6px;"><strong>System focus:</strong> ${this.escapeHtml(analysis.system_description || "")}</div>
+            <div style="margin-top:6px;"><strong>Pivot plan:</strong></div>
+            <ul class="thread-card-list">${pivot.map((item) => `<li>${this.escapeHtml(item)}</li>`).join("")}</ul>
+            <div style="margin-top:6px;"><strong>Key signals:</strong> ${this.escapeHtml(keySignals.join(", "))}</div>
+        `;
+        this.appendThreadCard("assistant", analysis.target_role || "Role read", body);
+    }
+
+    onGeneratedContentEdit() {
+        const content = this.generatedContentEditor.value;
+        this.contentInput.value = content;
+        this.onContentChange();
+    }
+
+    startVoiceInput(targetInput, triggerButton) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            this.showAiError("Voice input is not supported in this browser.");
+            return;
+        }
+
+        if (this.speechRecognition) {
+            this.speechRecognition.stop();
+            this.speechRecognition = null;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = "en-US";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        this.speechRecognition = recognition;
+        triggerButton.textContent = "Listening...";
+        this.showAiError("");
+
+        recognition.onresult = (event) => {
+            const transcript = event.results?.[0]?.[0]?.transcript || "";
+            if (!transcript) return;
+            const existing = targetInput.value.trim();
+            targetInput.value = existing ? `${existing} ${transcript}` : transcript;
+            targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+        };
+
+        recognition.onerror = () => {
+            this.showAiError("Voice input failed. Try again.");
+        };
+
+        recognition.onend = () => {
+            triggerButton.textContent = triggerButton === this.jdVoiceBtn ? "Voice to JD" : "Voice";
+            this.speechRecognition = null;
+        };
+
+        recognition.start();
+    }
+
+    async resetAiMemory() {
+        const sessionId = this.aiSessionId;
+        this.aiSessionId = null;
+        this.lastGeneratedJobDescription = "";
+        this.updateAiMemoryBadge(0, 2);
+        this.showAiError("");
+        this.aiInstructionInput.value = "";
+        this.generatedContentEditor.value = "";
+        this.aiResultArea.style.display = "none";
+        this.contentInput.value = "";
+        this.jobDescriptionInput.value = "";
+        this.onContentChange();
+        this.renderThreadEmpty();
+
+        if (!sessionId) return;
+
+        try {
+            await fetch("/api/ai/reset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ session_id: sessionId }),
+            });
+        } catch (error) {
+            console.error("AI reset error:", error);
+        }
+    }
+
+    async generateFromJobDescription() {
+        const jobDescription = this.jobDescriptionInput.value.trim();
+        const revisionRequest = this.aiInstructionInput.value.trim();
+
+        if (!jobDescription) {
+            this.showAiError("Paste a job description first.");
+            return;
+        }
+
+        const resetMemory = !this.aiSessionId || (this.lastGeneratedJobDescription && this.lastGeneratedJobDescription !== jobDescription);
+
+        this.isAiGenerating = true;
+        this.aiGenerateBtn.disabled = true;
+        this.aiResetBtn.disabled = true;
+        this.jdVoiceBtn.disabled = true;
+        this.refineVoiceBtn.disabled = true;
+        this.showAiError("");
+        this.aiStatusBadge.textContent = "Generating...";
+
+        try {
+            if (resetMemory) {
+                this.renderThreadEmpty();
+                this.appendThreadCard("user", "New job description", `<div>${this.escapeHtml(jobDescription.slice(0, 600))}</div>`);
+            } else if (revisionRequest) {
+                this.appendThreadCard("user", "Refinement request", `<div>${this.escapeHtml(revisionRequest)}</div>`);
+            }
+
+            const response = await fetch("/api/ai/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    job_description: jobDescription,
+                    revision_request: revisionRequest,
+                    current_resume_content: this.contentInput.value.trim(),
+                    session_id: this.aiSessionId,
+                    reset_memory: resetMemory,
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Failed to generate resume content");
+            }
+
+            this.aiSessionId = data.session_id || null;
+            this.lastGeneratedJobDescription = jobDescription;
+            this.updateAiMemoryBadge(data.memory_count || 0, data.memory_limit || 2);
+            this.aiStatusBadge.textContent = "AI Ready";
+            this.aiStatusBadge.classList.add("status-ok");
+            this.aiStatusBadge.classList.remove("status-error");
+            this.renderSoulMessage(data.analysis);
+
+            this.aiResultArea.style.display = "flex";
+            this.generatedContentEditor.value = data.content || "";
+            this.contentInput.value = data.content || "";
+            this.onContentChange();
+            this.showTab("parsed");
+        } catch (error) {
+            console.error("AI generate error:", error);
+            this.aiStatusBadge.textContent = "AI Error";
+            this.aiStatusBadge.classList.add("status-error");
+            this.aiStatusBadge.classList.remove("status-ok");
+            this.showAiError(error.message || "Failed to generate resume content.");
+        } finally {
+            this.isAiGenerating = false;
+            this.aiGenerateBtn.disabled = false;
+            this.aiResetBtn.disabled = false;
+            this.jdVoiceBtn.disabled = false;
+            this.refineVoiceBtn.disabled = false;
+        }
     }
 
     // Auto-validate and preview with debounce

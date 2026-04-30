@@ -83,6 +83,16 @@ html, body {
     font-weight: 600;
 }
 
+.badge.status-ok {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.badge.status-error {
+    background: #fee2e2;
+    color: #7f1d1d;
+}
+
 .action-toolbar {
     background: white;
     border-bottom: 1px solid var(--gray-200);
@@ -158,6 +168,171 @@ html, body {
     transition: border-color 0.2s ease;
     margin: 12px;
     min-height: 0;
+}
+
+.ai-workbench {
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    flex: 1;
+    min-height: 0;
+}
+
+.ai-workbench-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.ai-memory-strip {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.jd-input {
+    flex: 0 0 auto;
+    margin: 0;
+    min-height: 180px;
+}
+
+.ai-controls {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+}
+
+.ai-controls .folder-input {
+    min-width: 0;
+}
+
+.ai-analysis {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.ai-analysis-header {
+    color: var(--gray-900);
+    margin-bottom: 8px;
+}
+
+.ai-analysis-content {
+    color: var(--gray-700);
+    display: grid;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.analysis-block strong {
+    color: var(--primary);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.ai-error {
+    background: #fee2e2;
+    color: #7f1d1d;
+    margin: 0;
+}
+
+.app-shell {
+    overflow: hidden;
+}
+
+.ai-thread {
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 180px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.ai-result-area {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+}
+
+.thread-empty {
+    color: var(--gray-500);
+    font-size: 0.9rem;
+}
+
+.thread-card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.thread-card.user {
+    border-left: 3px solid var(--gray-400);
+}
+
+.thread-card.assistant {
+    border-left: 3px solid var(--primary);
+}
+
+.thread-card-header {
+    color: var(--gray-900);
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.thread-card-title {
+    color: var(--primary);
+    display: block;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.thread-card-body {
+    color: var(--gray-700);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.thread-card-list {
+    margin-top: 6px;
+    padding-left: 18px;
+}
+
+.thread-card-list li {
+    margin-bottom: 4px;
+}
+
+.generated-artifact {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.generated-artifact-header {
+    color: var(--gray-900);
+}
+
+.generated-content-editor {
+    flex: 1;
+    margin: 0;
+    min-height: 360px;
+}
+
+.ai-refine-bar {
+    align-items: center;
+    display: flex;
+    gap: 8px;
 }
 
 .resume-input:focus {
@@ -804,6 +979,17 @@ html, body {
 
     .generate-controls {
         align-items: stretch;
+    }
+
+    .ai-workbench-header,
+    .ai-controls,
+    .ai-refine-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .ai-memory-strip {
+        justify-content: flex-start;
     }
 
     .generate-controls .btn {
