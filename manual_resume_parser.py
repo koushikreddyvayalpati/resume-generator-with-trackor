@@ -252,15 +252,22 @@ def parse_updated_content_to_resume(updated_text: str, base_resume: dict) -> dic
         resume["technical_skills"] = skills
 
     # Update experience with parsed titles and bullets
+    # If the experience section exists but no company content has been generated yet,
+    # do not fall back to the base resume's experience bullets.
+    if exp_text is not None:
+        for exp_entry in resume.get("experience", []):
+            exp_entry["title"] = ""
+            exp_entry["bullets"] = []
+
     # Keep company name, location, dates hardcoded
     if company_data:
         for exp_entry in resume.get("experience", []):
             company_name = exp_entry["company"]
             if company_name in company_data:
                 data = company_data[company_name]
-                if data["title"]:  # Only update if we found a title
+                if data["title"]:
                     exp_entry["title"] = data["title"]
-                if data["bullets"]:  # Only update if we found bullets
+                if data["bullets"]:
                     exp_entry["bullets"] = data["bullets"]
 
     return resume

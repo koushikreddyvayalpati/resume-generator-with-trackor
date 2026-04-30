@@ -1,0 +1,1030 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+
+const gmailPreset = {
+  location: "Dallas, TX",
+  phone: "(469)963-5323",
+  email: "tmanikonda.1@gmail.com",
+};
+
+const emptyProfile = {
+  name: "",
+  contact: { location: "", phone: "", email: "" },
+  certifications: [],
+  projects: [],
+};
+
+function fetchJson(url, options = {}) {
+  return fetch(url, options).then(async (response) => {
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.error || data.message || "Request failed");
+      error.data = data;
+      throw error;
+    }
+    return data;
+  });
+}
+
+function applyBold(text) {
+  return (text || "").split(/(\*\*.*?\*\*)/g).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    return <React.Fragment key={index}>{part}</React.Fragment>;
+  });
+}
+
+function looksLikeJobDescription(text) {
+  const value = (text || "").trim();
+  if (!value) return false;
+
+  const lower = value.toLowerCase();
+  const jdSignals = [
+    "about the job",
+    "role description",
+    "company description",
+    "qualifications",
+    "responsibilities",
+    "preferred qualifications",
+    "basic qualifications",
+    "essential qualifications",
+    "about the role",
+    "what you'll do",
+    "what you will do",
+    "job description",
+  ];
+
+  if (value.length > 600) return true;
+  return jdSignals.some((signal) => lower.includes(signal));
+}
+
+function ThreadCard({ entry }) {
+  return (
+    <div className={`thread-card ${entry.kind}`}>
+      <div className="thread-card-header">{entry.kind === "user" ? "You" : "Resume Engine"}</div>
+      {entry.title ? <div className="thread-card-title">{entry.title}</div> : null}
+      <div className="thread-card-body">
+        {entry.lines?.map((line, index) => (
+          <p key={index}>{line}</p>
+        ))}
+        {entry.list?.length ? (
+          <ul className="thread-card-list">
+            {entry.list.map((item, index) => (
+              <li key={index}>{item}</li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ParsedPreview({ preview, loadingExperience }) {
+  if (!preview) {
+    return <div className="blank-state">Generate content to see the parsed preview.</div>;
+  }
+
+  const contactLine = [preview.contact?.location, preview.contact?.phone, preview.contact?.email]
+    .filter(Boolean)
+    .join(" | ");
+
+  return (
+    <div className="preview-scroll">
+      <section className="preview-section">
+        <div className="preview-title">{preview.title || ""}</div>
+        {contactLine ? <div className="preview-contact">{contactLine}</div> : null}
+      </section>
+
+      {preview.summary ? (
+        <section className="preview-section">
+          <h3 className="section-label">Summary</h3>
+          <p className="preview-copy">{preview.summary || ""}</p>
+        </section>
+      ) : null}
+
+      {preview.technical_skills?.length ? (
+        <section className="preview-section">
+          <h3 className="section-label">Technical Skills</h3>
+          <div className="skill-list">
+            {preview.technical_skills.map((skill) => (
+              <div key={skill.category} className="skill-row editable-row">
+                <strong>{skill.category}:</strong>
+                <span className="skill-row-text">{skill.items || ""}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {loadingExperience ? (
+        <section className="preview-section">
+          <h3 className="section-label">Professional Experience</h3>
+          <div className="preview-loading-state">Professional experience is still generating...</div>
+        </section>
+      ) : preview.experience?.length ? (
+        <section className="preview-section">
+          <h3 className="section-label">Professional Experience</h3>
+          <div className="experience-list">
+            {preview.experience.map((item) => (
+              <article key={`${item.company}-${item.dates}`} className="experience-card">
+                <div className="experience-company">{item.company} | {item.dates}</div>
+                <div className="experience-title-text">{item.title || ""}</div>
+                <div className="experience-bullets">
+                  {(item.bullets || []).map((bullet, index) => (
+                    <div key={index} className="experience-bullet editable-row">
+                      <span>•</span>
+                      <span className="experience-bullet-text">{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function Modal({ open, title, onClose, children, footer }) {
+  if (!open) return null;
+  return (
+    <div className="modal-shell" role="dialog" aria-modal="true">
+      <button className="modal-backdrop" onClick={onClose} aria-label="Close modal" />
+      <div className="modal-card">
+        <div className="modal-header">
+          <h2>{title}</h2>
+          <button className="icon-button" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {footer ? <div className="modal-footer">{footer}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function SideDrawer({ open, title, onClose, children }) {
+  if (!open) return null;
+  return (
+    <div className="drawer-shell" role="dialog" aria-modal="true">
+      <button className="drawer-backdrop" onClick={onClose} aria-label="Close drawer" />
+      <aside className="drawer-panel">
+        <div className="drawer-header">
+          <h2>{title}</h2>
+          <button className="icon-button" onClick={onClose}>✕</button>
+        </div>
+        <div className="drawer-body">{children}</div>
+      </aside>
+    </div>
+  );
+}
+
+function formatProjects(projects) {
+  return (projects || [])
+    .map((project) => {
+      const bullets = (project.bullets || []).map((bullet) => `- ${bullet}`).join("\n");
+      return [project.name || "", bullets].filter(Boolean).join("\n");
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function parseProjects(text) {
+  return text
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+      const name = lines.shift() || "";
+      const bullets = lines.map((line) => line.replace(/^[-•●]\s*/, "").trim()).filter(Boolean);
+      return { name, bullets };
+    })
+    .filter((project) => project.name);
+}
+
+export default function App() {
+  const [profile, setProfile] = useState(emptyProfile);
+  const [profileDraft, setProfileDraft] = useState(emptyProfile);
+  const [settings, setSettings] = useState({ output_directory: "" });
+  const [settingsDraft, setSettingsDraft] = useState("");
+  const [pdfStatus, setPdfStatus] = useState({ ready: false, message: "Checking..." });
+  const [aiStatus, setAiStatus] = useState({ ready: false, message: "Checking...", model: "gpt-5-mini", memory_limit: 2 });
+  const [identity, setIdentity] = useState("outlook");
+  const [contact, setContact] = useState({ location: "", phone: "", email: "" });
+  const [companyName, setCompanyName] = useState("");
+  const [composerInput, setComposerInput] = useState("");
+  const [generatedContent, setGeneratedContent] = useState("");
+  const [preview, setPreview] = useState(null);
+  const [validation, setValidation] = useState({ valid: false, errors: [] });
+  const [tab, setTab] = useState("parsed");
+  const [aiSessionId, setAiSessionId] = useState(null);
+  const [lastGeneratedJd, setLastGeneratedJd] = useState("");
+  const [memoryCount, setMemoryCount] = useState(0);
+  const [aiThread, setAiThread] = useState([]);
+  const [aiError, setAiError] = useState("");
+  const [showGeneratedArea, setShowGeneratedArea] = useState(false);
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [aiStage, setAiStage] = useState("");
+  const [previewEditMode, setPreviewEditMode] = useState(false);
+  const [pdfState, setPdfState] = useState({
+    mode: "idle",
+    error: "",
+    statusPath: "",
+    pdfPath: "",
+    outputDir: "",
+    statusLabel: "",
+  });
+  const [modals, setModals] = useState({
+    instructions: false,
+    settings: false,
+    profile: false,
+    controls: false,
+  });
+
+  const mediaRecorderRef = useRef(null);
+  const mediaChunksRef = useRef([]);
+  const streamRef = useRef(null);
+  const [recordingTarget, setRecordingTarget] = useState("");
+
+  useEffect(() => {
+    fetchJson("/api/settings")
+      .then((data) => {
+        setSettings(data);
+        setSettingsDraft(data.output_directory || "");
+        setPdfStatus({
+          ready: !!data.pdf_conversion_ready,
+          message: data.pdf_conversion_status || "Unknown",
+        });
+      })
+      .catch(() => {});
+
+    fetchJson("/api/profile")
+      .then((data) => {
+        setProfile(data);
+        setProfileDraft({
+          ...data,
+          contact: { ...(data.contact || emptyProfile.contact) },
+        });
+        setContact(data.contact || emptyProfile.contact);
+      })
+      .catch(() => {});
+
+    fetchJson("/api/ai/status")
+      .then((data) => setAiStatus(data))
+      .catch((error) => {
+        setAiStatus((current) => ({ ...current, ready: false, message: error.message }));
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!generatedContent.trim()) {
+      setPreview(null);
+      setValidation({ valid: false, errors: [] });
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      fetchJson("/api/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: generatedContent,
+          contact_override: contact,
+          identity,
+        }),
+      })
+        .then((data) => {
+          setPreview(data.preview);
+          setValidation({ valid: !!data.valid, errors: data.errors || [] });
+        })
+        .catch((error) => {
+          setValidation({ valid: false, errors: [error.message] });
+        });
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [generatedContent, contact, identity]);
+
+  useEffect(() => {
+    if (pdfState.mode !== "polling" || !pdfState.statusPath) return undefined;
+
+    const timer = window.setInterval(() => {
+      const url = `/api/status?path=${encodeURIComponent(pdfState.statusPath)}`;
+      fetchJson(url)
+        .then((data) => {
+          if (data.state === "completed" || data.state === "success") {
+            setPdfState((current) => ({
+              ...current,
+              mode: "ready",
+              pdfPath: data.pdf || current.pdfPath,
+              statusLabel: "PDF ready",
+            }));
+          } else if (data.state === "failed" || data.state === "error") {
+            setPdfState((current) => ({
+              ...current,
+              mode: "error",
+              error: data.error || "PDF generation failed",
+            }));
+          } else {
+            setPdfState((current) => ({
+              ...current,
+              statusLabel: data.message || "Generating PDF...",
+            }));
+          }
+        })
+        .catch((error) => {
+          setPdfState((current) => ({
+            ...current,
+            mode: "error",
+            error: error.message,
+          }));
+        });
+    }, 1500);
+
+    return () => window.clearInterval(timer);
+  }, [pdfState.mode, pdfState.statusPath]);
+
+  const charCount = generatedContent.length;
+  const pdfPreviewUrl = pdfState.pdfPath
+    ? `/api/download?path=${encodeURIComponent(pdfState.pdfPath)}&preview=true`
+    : "";
+
+  const canGeneratePdf = validation.valid && generatedContent.trim().length > 0;
+
+  const contactForIdentity = useMemo(
+    () => ({
+      outlook: profile.contact || emptyProfile.contact,
+      gmail: gmailPreset,
+    }),
+    [profile.contact],
+  );
+
+  const statusBadgeClass = aiStatus.ready ? "badge status-ok" : "badge status-error";
+  const jdModeLabel = showGeneratedArea ? "Current JD active" : "Waiting for new JD";
+
+  function openModal(name) {
+    if (name === "settings") {
+      fetchJson("/api/settings").then((data) => {
+        setSettings(data);
+        setSettingsDraft(data.output_directory || "");
+      }).catch(() => {});
+    }
+    if (name === "profile") {
+      fetchJson("/api/profile").then((data) => {
+        setProfileDraft({
+          ...data,
+          contact: { ...(data.contact || emptyProfile.contact) },
+          certificationsText: (data.certifications || []).join("\n"),
+          projectsText: formatProjects(data.projects || []),
+        });
+      }).catch(() => {});
+    }
+    setModals((current) => ({ ...current, [name]: true }));
+  }
+
+  function closeModal(name) {
+    setModals((current) => ({ ...current, [name]: false }));
+  }
+
+  function resetAiSession(clearJd = true) {
+    const sessionId = aiSessionId;
+    setAiSessionId(null);
+    setLastGeneratedJd("");
+    setMemoryCount(0);
+    setAiThread([]);
+    setAiError("");
+    setShowGeneratedArea(false);
+    setGeneratedContent("");
+    setAiStage("");
+    if (clearJd) setComposerInput("");
+
+    if (sessionId) {
+      fetchJson("/api/ai/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      }).catch(() => {});
+    }
+  }
+
+  async function stopRecorder() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  }
+
+  async function startVoiceInput(target, setter) {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setAiError("Local voice recording is not supported in this browser.");
+      return;
+    }
+
+    if (recordingTarget === target) {
+      stopRecorder();
+      return;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      mediaChunksRef.current = [];
+
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = recorder;
+      setRecordingTarget(target);
+      setAiError("");
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          mediaChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        setAiError("Voice recording failed. Try again.");
+        setRecordingTarget("");
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(mediaChunksRef.current, { type: "audio/webm" });
+        mediaRecorderRef.current = null;
+        mediaChunksRef.current = [];
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+        setRecordingTarget("");
+
+        if (!blob.size) {
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("audio", blob, "speech.webm");
+        formData.append("target", target);
+
+        try {
+          const data = await fetchJson("/api/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+          setter((current) => (current ? `${current} ${data.text}` : data.text));
+        } catch (error) {
+          setAiError(error.message || "Voice transcription failed.");
+        }
+      };
+
+      recorder.start();
+    } catch (error) {
+      setRecordingTarget("");
+      setAiError("Microphone access failed.");
+    }
+  }
+
+  function soulThreadEntry(analysis) {
+    return {
+      kind: "assistant",
+      title: analysis.target_role || "Role summary",
+      lines: [
+        `Soul of the role: ${analysis.core_problem || ""}`,
+        `System focus: ${analysis.system_description || ""}`,
+        `Key signals: ${(analysis.core_skills || []).slice(0, 6).join(", ")}`,
+      ],
+      list: (analysis.build_strategy || []).slice(0, 3),
+    };
+  }
+
+  async function submitAiGeneration() {
+    const promptText = composerInput.trim();
+    if (!promptText) {
+      setAiError(aiSessionId ? "Enter the changes you want." : "Paste a job description first.");
+      return;
+    }
+
+    const autoDetectedNewJd = !!aiSessionId && looksLikeJobDescription(promptText);
+    const isNewJd = !aiSessionId || autoDetectedNewJd;
+    const jd = isNewJd ? promptText : lastGeneratedJd;
+    const revisionRequest = isNewJd ? "" : promptText;
+    const userEntry = isNewJd
+      ? { kind: "user", title: "", lines: [promptText.slice(0, 1200)] }
+      : { kind: "user", title: "Changes", lines: [promptText] };
+    const baseThread = isNewJd
+      ? (userEntry ? [userEntry] : [])
+      : [...aiThread, ...(userEntry ? [userEntry] : [])];
+
+    setComposerInput("");
+    setAiThread(baseThread);
+
+    setGeneratingAi(true);
+    setAiError("");
+    setAiStage("analyzing");
+    if (isNewJd) {
+      if (autoDetectedNewJd) {
+        setAiSessionId(null);
+        setMemoryCount(0);
+        setGeneratedContent("");
+        setPreview(null);
+        setValidation({ valid: false, errors: [] });
+      }
+      setCompanyName("");
+    }
+
+    try {
+      const analyzeData = await fetchJson("/api/ai/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_description: jd,
+          revision_request: revisionRequest,
+          current_resume_content: generatedContent,
+          session_id: aiSessionId,
+          reset_memory: isNewJd,
+        }),
+      });
+
+      const nextSessionId = analyzeData.session_id || aiSessionId || null;
+      setAiSessionId(nextSessionId);
+      setLastGeneratedJd(jd);
+      setMemoryCount(analyzeData.memory_count || 0);
+      setAiThread([...baseThread, soulThreadEntry(analyzeData.analysis)]);
+      setShowGeneratedArea(true);
+      setPreviewEditMode(false);
+      setTab("parsed");
+
+      setAiStage("core");
+      const coreData = await fetchJson("/api/ai/generate-core", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_description: jd,
+          revision_request: revisionRequest,
+          current_resume_content: generatedContent,
+          session_id: nextSessionId,
+          reset_memory: false,
+        }),
+      });
+
+      const sessionAfterCore = coreData.session_id || nextSessionId;
+      setAiSessionId(sessionAfterCore);
+      setMemoryCount(coreData.memory_count || 0);
+      setGeneratedContent(coreData.content || "");
+      setShowGeneratedArea(true);
+      setAiThread((current) => [
+        ...current,
+        { kind: "assistant", title: "Core Draft Ready", lines: ["Summary and technical skills are ready. Professional experience is still generating."] },
+      ]);
+
+      setAiStage("experience");
+      const experienceData = await fetchJson("/api/ai/generate-experience", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_description: jd,
+          revision_request: revisionRequest,
+          current_resume_content: coreData.content || generatedContent,
+          session_id: sessionAfterCore,
+          reset_memory: false,
+        }),
+      });
+
+      setAiSessionId(experienceData.session_id || sessionAfterCore || null);
+      setMemoryCount(experienceData.memory_count || 0);
+      setGeneratedContent(experienceData.content || coreData.content || "");
+      setShowGeneratedArea(true);
+      setComposerInput("");
+      setTab("parsed");
+      setAiThread((current) => [
+        ...current,
+        { kind: "assistant", title: "Resume Complete", lines: ["Complete resume is generated. You can edit it directly in the parsed preview."] },
+      ]);
+    } catch (error) {
+      const payload = error.data || {};
+      if (payload.analysis) {
+        setAiSessionId(payload.session_id || aiSessionId || null);
+        setMemoryCount(payload.memory_count || 0);
+        setAiThread([...baseThread, soulThreadEntry(payload.analysis)]);
+        setShowGeneratedArea(true);
+      }
+      if (payload.content) {
+        setGeneratedContent(payload.content);
+        setShowGeneratedArea(true);
+        setTab("parsed");
+      }
+
+      const stageNames = {
+        analysis: "JD analysis failed",
+        core_generation: "Core resume generation failed",
+        experience_generation: "Experience generation failed",
+        resume_generation: "Resume generation failed",
+      };
+      const stageLabel = stageNames[payload.stage] || "";
+      const totalMs = payload.timing?.total_ms || payload.timing?.analysis_ms || payload.timing?.core_ms || payload.timing?.experience_ms;
+      const timingLabel = totalMs ? ` (${Math.round(totalMs / 100) / 10}s)` : "";
+      setAiError(stageLabel ? `${stageLabel}${timingLabel}: ${error.message}` : error.message);
+    } finally {
+      setGeneratingAi(false);
+      setAiStage("");
+    }
+  }
+
+  function submitPdfGeneration() {
+    if (!canGeneratePdf) return;
+
+    setPdfState({
+      mode: "loading",
+      error: "",
+      statusPath: "",
+      pdfPath: "",
+      outputDir: "",
+      statusLabel: "Submitting...",
+    });
+    setTab("pdf");
+
+    fetchJson("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        content: generatedContent,
+        company_name: companyName,
+        contact_override: contact,
+        identity,
+      }),
+    })
+      .then((data) => {
+        setPdfState({
+          mode: "polling",
+          error: "",
+          statusPath: data.status_path,
+          pdfPath: data.pdf,
+          outputDir: data.output_dir,
+          statusLabel: "Generating PDF...",
+        });
+      })
+      .catch((error) => {
+        setPdfState({
+          mode: "error",
+          error: error.message,
+          statusPath: "",
+          pdfPath: "",
+          outputDir: "",
+          statusLabel: "",
+        });
+      });
+  }
+
+  function saveSettings() {
+    fetchJson("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ output_directory: settingsDraft }),
+    })
+      .then((data) => {
+        setSettings((current) => ({ ...current, output_directory: data.output_directory }));
+        closeModal("settings");
+      })
+      .catch((error) => window.alert(error.message));
+  }
+
+  function saveProfile() {
+    const payload = {
+      name: profileDraft.name || "",
+      contact: profileDraft.contact || emptyProfile.contact,
+      certifications: (profileDraft.certificationsText || "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+      projects: parseProjects(profileDraft.projectsText || ""),
+    };
+
+    fetchJson("/api/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((data) => {
+        setProfile(data.profile);
+        setContact(data.profile.contact || emptyProfile.contact);
+        closeModal("profile");
+      })
+      .catch((error) => window.alert(error.message));
+  }
+
+  function selectIdentity(nextIdentity) {
+    setIdentity(nextIdentity);
+    setContact(contactForIdentity[nextIdentity] || emptyProfile.contact);
+  }
+
+  function handleComposerKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (!generatingAi) {
+        submitAiGeneration();
+      }
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand-wrap">
+          <div className="brand-dot" />
+          <div className="brand">Resume Generator</div>
+        </div>
+        <div className="topbar-actions">
+          <button className="icon-button" onClick={() => openModal("controls")}>ID</button>
+          <button className="icon-button" onClick={() => openModal("instructions")}>?</button>
+          <button className="icon-button" onClick={() => openModal("settings")}>⚙</button>
+          <span className={pdfStatus.ready ? "badge status-ok" : "badge status-error"}>
+            {pdfStatus.ready ? "Ready" : "PDF Error"}
+          </span>
+        </div>
+      </header>
+
+      <main className="workspace chatgpt-shell">
+        <section className="chat-surface">
+          <div className="chat-surface-header">
+            <div>
+              <div className="panel-eyebrow">Conversation</div>
+              <div className="panel-title">JD to Resume</div>
+            </div>
+          </div>
+          <div className="chat-scroll">
+            {!showGeneratedArea ? (
+              <div className="chat-intro">
+                <div className="intro-card">
+                  <h2>Paste a job description to start.</h2>
+                  <p>We automatically treat the first message as a new JD. After the draft is created, the same input becomes your change box for that JD until you start a new one.</p>
+                </div>
+              </div>
+            ) : null}
+
+            {aiError ? <div className="error-banner">{aiError}</div> : null}
+
+            {aiThread.map((entry, index) => (
+              <ThreadCard key={`${entry.kind}-${index}`} entry={entry} />
+            ))}
+
+            {generatingAi ? (
+              <div className="loading-card" aria-live="polite">
+                <div className="loading-card-header">Resume Engine</div>
+                <div className="loading-card-body">
+                  <div className="loading-dots">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                  <div className="loading-copy">
+                    {aiStage === "analyzing"
+                      ? "Analyzing the JD..."
+                      : aiStage === "core"
+                        ? "Building title, summary, and skills..."
+                        : aiStage === "experience"
+                          ? "Writing the experience section..."
+                          : showGeneratedArea
+                            ? "Updating the draft for this JD..."
+                            : "Reading the JD and building the first draft..."}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+                {showGeneratedArea ? (
+                  <div className="chat-block">
+                    <div className="message-label">
+                      {generatingAi && (aiStage === "core" || aiStage === "experience") ? "Core Resume Draft" : "Generated Resume"}
+                      {generatingAi && aiStage === "experience" ? <span className="inline-status-pill">Experience still generating</span> : null}
+                    </div>
+                  </div>
+                ) : null}
+          </div>
+          <div className="chat-composer-shell">
+            <div className="composer-card">
+              <textarea
+                className="composer-textarea"
+                value={composerInput}
+                onChange={(e) => setComposerInput(e.target.value)}
+                onKeyDown={handleComposerKeyDown}
+                placeholder={showGeneratedArea ? "Ask for changes for this JD only" : "Paste the full job description here"}
+              />
+              <div className="composer-toolbar">
+                <div className="composer-toolbar-left">
+                  <button className="composer-pill" onClick={() => resetAiSession(true)}>New JD</button>
+                </div>
+                <div className="composer-toolbar-right">
+                  <span className="composer-state">
+                    {showGeneratedArea ? "Editing current JD" : "Ready for new JD"}
+                  </span>
+                  <button
+                    className={`composer-icon-button ${recordingTarget === (showGeneratedArea ? "refinement" : "jd") ? "recording" : ""}`}
+                    onClick={() => startVoiceInput(showGeneratedArea ? "refinement" : "jd", setComposerInput)}
+                    aria-label={recordingTarget === (showGeneratedArea ? "refinement" : "jd") ? "Stop voice input" : "Start voice input"}
+                  >
+                    {recordingTarget === (showGeneratedArea ? "refinement" : "jd") ? "Stop" : "Mic"}
+                  </button>
+                  <button
+                    className="composer-send-button"
+                    disabled={generatingAi}
+                    onClick={submitAiGeneration}
+                    aria-label={showGeneratedArea ? "Update draft" : "Generate content"}
+                  >
+                    {generatingAi ? "..." : "Send"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="panel preview-surface">
+          <div className="preview-toolbar">
+            <div className="preview-toolbar-left">
+              <div className="panel-eyebrow">Output</div>
+              <div className="preview-toolbar-actions">
+                <input
+                  className="preview-company-input"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Company name (required)"
+                />
+                <button
+                  className="primary-button"
+                  disabled={!canGeneratePdf || !companyName.trim() || pdfState.mode === "loading" || pdfState.mode === "polling"}
+                  onClick={submitPdfGeneration}
+                >
+                  Generate PDF
+                </button>
+              </div>
+            </div>
+            <div className="preview-toolbar-right">
+              {tab === "parsed" && preview ? (
+                <button
+                  className="secondary-button"
+                  onClick={() => setPreviewEditMode((current) => !current)}
+                >
+                  {previewEditMode ? "Done" : "Edit"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+          <div className="tabs">
+            <button className={`tab-button ${tab === "parsed" ? "active" : ""}`} onClick={() => setTab("parsed")}>Parsed Preview</button>
+            <button className={`tab-button ${tab === "pdf" ? "active" : ""}`} onClick={() => setTab("pdf")}>PDF Preview</button>
+          </div>
+          <div className="panel-body preview-body">
+            {tab === "parsed" ? (
+              <>
+                {validation.errors?.length ? (
+                  <div className="error-list">
+                    {validation.errors.map((error, index) => <div key={index}>{error}</div>)}
+                  </div>
+                ) : null}
+                {previewEditMode ? (
+                  <textarea
+                    className="preview-editor"
+                    value={generatedContent}
+                    onChange={(e) => setGeneratedContent(e.target.value)}
+                  />
+                ) : (
+                  <ParsedPreview
+                    preview={preview}
+                    loadingExperience={generatingAi && aiStage === "experience"}
+                  />
+                )}
+              </>
+            ) : (
+              <div className="pdf-shell">
+                {pdfState.mode === "idle" ? <div className="blank-state">Generate a resume to preview the PDF.</div> : null}
+                {pdfState.mode === "loading" || pdfState.mode === "polling" ? (
+                  <div className="blank-state">{pdfState.statusLabel || "Generating PDF..."}</div>
+                ) : null}
+                {pdfState.mode === "error" ? <div className="error-banner">{pdfState.error}</div> : null}
+                {pdfState.mode === "ready" ? (
+                  <>
+                    <div className="pdf-actions">
+                      <a className="primary-button link-button" href={`/api/download?path=${encodeURIComponent(pdfState.pdfPath)}`}>Download</a>
+                      <button className="secondary-button" onClick={() => fetchJson("/api/open-folder", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ path: pdfState.outputDir }),
+                      }).catch((error) => window.alert(error.message))}>Open Folder</button>
+                    </div>
+                    <iframe title="PDF Preview" className="pdf-frame" src={pdfPreviewUrl} />
+                  </>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </section>
+      </main>
+
+      <Modal
+        open={modals.instructions}
+        title="Format Guide"
+        onClose={() => closeModal("instructions")}
+      >
+        <div className="modal-copy">
+          <p><strong>Updated Title</strong> followed by the target role.</p>
+          <p><strong>Updated Summary</strong> with 3-4 production-focused lines.</p>
+          <p><strong>Updated Skills</strong> as category-to-skill lists.</p>
+          <p><strong>Professional Experience</strong> with the fixed company order and bullet rules.</p>
+        </div>
+      </Modal>
+
+      <Modal
+        open={modals.settings}
+        title="Settings"
+        onClose={() => closeModal("settings")}
+        footer={(
+          <>
+            <button className="secondary-button" onClick={() => closeModal("settings")}>Cancel</button>
+            <button className="primary-button" onClick={saveSettings}>Save</button>
+          </>
+        )}
+      >
+        <label className="field">
+          Output Directory
+          <input value={settingsDraft} onChange={(e) => setSettingsDraft(e.target.value)} />
+        </label>
+      </Modal>
+
+      <Modal
+        open={modals.profile}
+        title="Profile"
+        onClose={() => closeModal("profile")}
+        footer={(
+          <>
+            <button className="secondary-button" onClick={() => closeModal("profile")}>Cancel</button>
+            <button className="primary-button" onClick={saveProfile}>Save Profile</button>
+          </>
+        )}
+      >
+        <div className="profile-grid">
+          <label className="field">
+            Name
+            <input value={profileDraft.name || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, name: e.target.value }))} />
+          </label>
+          <label className="field">
+            Location
+            <input value={profileDraft.contact?.location || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, contact: { ...(current.contact || {}), location: e.target.value } }))} />
+          </label>
+          <label className="field">
+            Phone
+            <input value={profileDraft.contact?.phone || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, contact: { ...(current.contact || {}), phone: e.target.value } }))} />
+          </label>
+          <label className="field">
+            Email
+            <input value={profileDraft.contact?.email || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, contact: { ...(current.contact || {}), email: e.target.value } }))} />
+          </label>
+        </div>
+        <label className="field">
+          Certifications
+          <textarea value={profileDraft.certificationsText || (profileDraft.certifications || []).join("\n")} onChange={(e) => setProfileDraft((current) => ({ ...current, certificationsText: e.target.value }))} />
+        </label>
+        <label className="field">
+          Projects
+          <textarea value={profileDraft.projectsText || formatProjects(profileDraft.projects || [])} onChange={(e) => setProfileDraft((current) => ({ ...current, projectsText: e.target.value }))} />
+        </label>
+      </Modal>
+
+      <SideDrawer
+        open={modals.controls}
+        title="Resume Controls"
+        onClose={() => closeModal("controls")}
+      >
+        <div className="drawer-section">
+          <div className="sidebar-label">Identity</div>
+          <div className="identity-group">
+            <button className={`toggle-button ${identity === "outlook" ? "active" : ""}`} onClick={() => selectIdentity("outlook")}>Outlook</button>
+            <button className={`toggle-button ${identity === "gmail" ? "active" : ""}`} onClick={() => selectIdentity("gmail")}>Gmail</button>
+          </div>
+        </div>
+
+        <div className="drawer-section">
+          <div className="sidebar-label">Contact</div>
+          <div className="sidebar-fields">
+            <input value={contact.location} onChange={(e) => setContact((current) => ({ ...current, location: e.target.value }))} placeholder="Location" />
+            <input value={contact.phone} onChange={(e) => setContact((current) => ({ ...current, phone: e.target.value }))} placeholder="Phone" />
+            <input value={contact.email} onChange={(e) => setContact((current) => ({ ...current, email: e.target.value }))} placeholder="Email" />
+          </div>
+        </div>
+
+        <div className="drawer-section">
+          <div className="sidebar-label">Output</div>
+          <span className="badge">PDF controls moved to preview</span>
+        </div>
+
+        <div className="drawer-section drawer-meta">
+          <span className={statusBadgeClass}>{aiStatus.ready ? "AI Ready" : "AI Error"}</span>
+          <span className="badge">{charCount} chars</span>
+          <span className="badge">{jdModeLabel}</span>
+          {memoryCount > 0 ? <span className="badge">Memory {memoryCount}/{aiStatus.memory_limit || 2}</span> : null}
+        </div>
+      </SideDrawer>
+    </div>
+  );
+}

@@ -25,6 +25,19 @@ The script will:
 4. Create `.env` if needed
 5. Start the app at `http://127.0.0.1:5001`
 
+## Run Locally
+
+After setup, you can start the current local app with:
+
+```bash
+./run_local.sh
+```
+
+This will:
+1. Install frontend packages if needed
+2. Build the current React UI
+3. Start the Flask app on `http://127.0.0.1:5001`
+
 ## Requirements
 
 - **Python 3.8+** — Download from https://www.python.org
