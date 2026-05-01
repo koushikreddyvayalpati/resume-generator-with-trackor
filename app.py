@@ -362,6 +362,21 @@ def skill_item_looks_like_model_meta(item: str) -> bool:
     return any(marker in text for marker in meta_markers)
 
 
+def expand_skill_items(raw_items: list) -> list[str]:
+    expanded: list[str] = []
+    for raw_item in raw_items or []:
+        cleaned = normalize_skill_item_text(raw_item)
+        if not cleaned:
+            continue
+        parts = [part.strip(" ,.;") for part in cleaned.split(",")]
+        non_empty_parts = [part for part in parts if part]
+        if len(non_empty_parts) >= 2:
+            expanded.extend(non_empty_parts)
+        else:
+            expanded.append(cleaned)
+    return expanded
+
+
 def normalize_updated_skills(skills_payload: list[dict]) -> list[dict]:
     if not isinstance(skills_payload, list):
         return []
@@ -377,8 +392,7 @@ def normalize_updated_skills(skills_payload: list[dict]) -> list[dict]:
         bucket = category_buckets.setdefault(category, [])
         local_seen: set[str] = {normalize_skill_dedupe_key(item) for item in bucket}
 
-        for raw_item in entry.get("items", []):
-            item = normalize_skill_item_text(raw_item)
+        for item in expand_skill_items(entry.get("items", [])):
             if not item:
                 continue
             if skill_item_looks_like_model_meta(item):
@@ -518,6 +532,8 @@ def build_ai_resume_prompt() -> str:
             "- Each category label must be separate from its values",
             "- Skill items must be plain phrases separated by commas",
             "- Do not use slashes, parentheses, brackets, or qualifier-style annotations inside skill items",
+            "- Each skill item must represent exactly one skill or capability",
+            "- Do not pack multiple skills into one item",
             "- Must include both:",
             "  - Core skills from the problem",
             "  - Supporting skills needed to build, deploy, scale, monitor, secure, and debug the system",
@@ -527,11 +543,21 @@ def build_ai_resume_prompt() -> str:
             "- The section must answer: what languages and technologies is this person hands-on with?",
             "- Include only relevant, believable, day-to-day skills",
             "- The skills section is for scanability; the experience section is where those skills are proven through usage",
+            "- Keep the JD-aligned stack visible when the role clearly favors a primary language or framework family",
+            "- Include both named technologies and the broader engineering capabilities demonstrated by the work",
+            "- Broader skills should capture how the candidate operates as an engineer, such as object-oriented backend development, application logic, debugging, tuning, delivery, and UI development when supported by the work",
+            "- If the bullets are adapted toward a target stack, the skills section must still reflect the broader engineering context behind those bullets",
+            "- The skills section must not collapse into only a narrow tool list",
             "- Order categories for recruiter scanability: strongest hands-on languages first, then backend/frontend, then data, cloud, messaging, observability, devops, security, testing, and broader system concepts",
             "- Do not repeat the same skill or concept across multiple categories",
             "- Prefer crisp hands-on skill names over phrase-heavy restatements of the same capability",
             "- Do not try to complete every JD keyword with a matching tool if the candidate's background does not strongly support it",
             "- Prefer the smallest believable set of hands-on technologies over a perfect-looking stack match",
+            "- Expected pattern:",
+            "  - Programming Languages: Python, Java, SQL",
+            "  - Backend Engineering: REST API design, Application logic, Service architecture",
+            "  - Testing & Quality: Unit testing, Integration testing, Debugging",
+            "- Avoid packed or descriptive items like 'AWS EC2 Lambda S3', 'JWT OAuth2', or 'Python expertise for backend APIs'",
             "",
             "EXPERIENCE:",
             "- Follow the fixed company, location, and date structure below exactly",
@@ -541,6 +567,11 @@ def build_ai_resume_prompt() -> str:
             "- Each bullet must be 25-30 words",
             "- Recent and relevant roles should do more of the selling than older roles",
             "- Older or less relevant roles should stay supportive and concise",
+            "- Expected experience pattern:",
+            "  - Company/location line",
+            "  - Role title and dates line",
+            "  - 1 bullet per achievement",
+            "  - Each bullet is one complete production-level accomplishment",
             "",
             "BULLET STRUCTURE (MANDATORY):",
             "Each bullet must follow:",
@@ -640,6 +671,7 @@ def build_ai_resume_prompt() -> str:
             "- Bullet counts per company correct",
             "- Each bullet has system + tool + constraint/decision + metric",
             "- Each company reads as one coherent project story",
+            "- Skills follow the expected one-item-per-skill pattern",
             "",
             "Do not output validation steps. Only output the final result matching the schema.",
             "",
@@ -684,13 +716,22 @@ def build_ai_resume_core_prompt() -> str:
             "- Use only allowed categories from the schema",
             "- Skill items must be plain comma-separated phrases",
             "- Do not use slashes, parentheses, brackets, or qualifier-style annotations inside skill items",
+            "- Each skill item must represent exactly one skill or capability",
+            "- Do not pack multiple skills into one item",
             "- Include both core JD-facing skills and supporting production-system skills",
             "- Answer: what languages and technologies is this person hands-on with?",
             "- Include only relevant, believable, day-to-day skills",
             "- Prioritize the strongest and most relevant hands-on skills first",
+            "- Keep the primary JD-aligned stack visible when the role clearly favors one",
+            "- Include broader engineering capabilities shown by the work, not just named tools",
+            "- The section must balance specific technologies with broader product-engineering or backend-engineering capabilities",
             "- Do not repeat the same skill or concept across categories",
             "- Prefer concrete hands-on skill names over abstract resume phrasing",
             "- Do not overfill the section with every plausible JD-adjacent tool; include only the strongest believable technologies",
+            "- Expected pattern:",
+            "  - Programming Languages: Java, SQL, JavaScript",
+            "  - Backend Engineering: REST API design, Application logic, Object-oriented development",
+            "  - Testing & Quality: Unit testing, Integration testing, Debugging",
             "",
             "ATS AND TONE RULES:",
             "- Align naturally to the JD",
@@ -763,6 +804,24 @@ def build_ai_resume_experience_prompt() -> str:
     )
 
 
+def build_ai_reachout_prompt() -> str:
+    return "\n".join(
+        [
+            "You write concise LinkedIn reachout notes for engineering candidates.",
+            "Write one short message under 300 characters total.",
+            "Use a compact, warm, high-signal style.",
+            "Match this structure closely: short opener, 2-3 compact candidate lines, direct ask, brief thanks.",
+            "Prefer line breaks over long sentences.",
+            "Keep each line short and punchy.",
+            "Use only facts grounded in the provided resume and JD.",
+            "Do not invent companies, internships, metrics, or domain expertise.",
+            "Do not use bullets, emojis, hashtags, or quotes.",
+            "Do not mention character limits in the message.",
+            "Return only the final result matching the schema.",
+        ]
+    )
+
+
 def ai_analysis_schema() -> dict:
     return {
         "type": "object",
@@ -796,6 +855,12 @@ def ai_analysis_schema() -> dict:
 
 def ai_resume_schema() -> dict:
     allowed_skill_categories = sorted(ALLOWED_SKILL_CATEGORIES)
+    skill_item_schema = {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 48,
+        "pattern": r"^[A-Za-z0-9+#.&' -]+$",
+    }
     experience_properties = {}
     required_experience_keys = []
     for blueprint in EXPERIENCE_BLUEPRINTS:
@@ -823,6 +888,7 @@ def ai_resume_schema() -> dict:
             "updated_summary": {"type": "string"},
             "updated_skills": {
                 "type": "array",
+                "minItems": 6,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
@@ -830,7 +896,7 @@ def ai_resume_schema() -> dict:
                         "category": {"type": "string", "enum": allowed_skill_categories},
                         "items": {
                             "type": "array",
-                            "items": {"type": "string"},
+                            "items": skill_item_schema,
                             "minItems": 2,
                         },
                     },
@@ -850,6 +916,12 @@ def ai_resume_schema() -> dict:
 
 def ai_resume_core_schema() -> dict:
     allowed_skill_categories = sorted(ALLOWED_SKILL_CATEGORIES)
+    skill_item_schema = {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 48,
+        "pattern": r"^[A-Za-z0-9+#.&' -]+$",
+    }
     return {
         "type": "object",
         "additionalProperties": False,
@@ -858,6 +930,7 @@ def ai_resume_core_schema() -> dict:
             "updated_summary": {"type": "string"},
             "updated_skills": {
                 "type": "array",
+                "minItems": 6,
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
@@ -865,7 +938,7 @@ def ai_resume_core_schema() -> dict:
                         "category": {"type": "string", "enum": allowed_skill_categories},
                         "items": {
                             "type": "array",
-                            "items": {"type": "string"},
+                            "items": skill_item_schema,
                             "minItems": 2,
                         },
                     },
@@ -909,6 +982,18 @@ def ai_experience_schema() -> dict:
             },
         },
         "required": ["experience"],
+    }
+
+
+def ai_reachout_schema() -> dict:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "message": {"type": "string"},
+            "char_count": {"type": "integer"},
+        },
+        "required": ["message", "char_count"],
     }
 
 
@@ -1128,7 +1213,7 @@ def validate_model_payload(model_payload: dict) -> list[str]:
     resume = model_payload.get("resume") or {}
     title = str(resume.get("updated_title", "")).strip()
     summary = str(resume.get("updated_summary", "")).strip()
-    skills = resume.get("updated_skills") or []
+    skills = normalize_updated_skills(resume.get("updated_skills") or [])
     experience = resume.get("experience") or {}
     jd_terms = {
         str(item).strip().lower()
@@ -1155,7 +1240,7 @@ def validate_model_payload(model_payload: dict) -> list[str]:
     all_skill_items: list[str] = []
     for entry in skills:
         category = str(entry.get("category", "")).strip()
-        items = [str(item).strip() for item in entry.get("items", []) if str(item).strip()]
+        items = expand_skill_items(entry.get("items", []))
         if not category:
             issues.append("A skills category is empty.")
             continue
@@ -1243,7 +1328,7 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
     issues: list[str] = []
     title = str(core_payload.get("updated_title", "")).strip()
     summary = str(core_payload.get("updated_summary", "")).strip()
-    skills = core_payload.get("updated_skills") or []
+    skills = normalize_updated_skills(core_payload.get("updated_skills") or [])
 
     if not title:
         issues.append("Updated title is empty.")
@@ -1261,7 +1346,7 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
     seen_categories: set[str] = set()
     for entry in skills:
         category = str(entry.get("category", "")).strip()
-        items = [str(item).strip() for item in entry.get("items", []) if str(item).strip()]
+        items = expand_skill_items(entry.get("items", []))
         if not category:
             issues.append("A skills category is empty.")
             continue
@@ -1282,6 +1367,27 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
         issues.append("Analysis is missing core_problem.")
     if not analysis_payload.get("target_role"):
         issues.append("Analysis is missing target_role.")
+
+    return issues
+
+
+def validate_reachout_payload(reachout_payload: dict) -> list[str]:
+    issues: list[str] = []
+    message = str(reachout_payload.get("message", "")).strip()
+    char_count = reachout_payload.get("char_count")
+
+    if not message:
+        issues.append("Reachout message is empty.")
+        return issues
+
+    if "\n\n" in message:
+        issues.append("Reachout message should stay compact.")
+    if len(message) > 300:
+        issues.append(f"Reachout message must be 300 characters or fewer; got {len(message)}.")
+    if isinstance(char_count, int) and char_count != len(message):
+        issues.append("Reachout character count does not match the message length.")
+    if re.search(r"[•#\"“”]", message):
+        issues.append("Reachout message contains unsupported formatting.")
 
     return issues
 
@@ -1378,7 +1484,7 @@ def generate_resume_core_from_analysis(
         user_prompt="\n\n".join(user_parts),
         schema_name="resume_core_generation",
         schema=ai_resume_core_schema(),
-        max_output_tokens=2600,
+        max_output_tokens=6500,
         request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
         reasoning_effort="low",
     )
@@ -1427,6 +1533,47 @@ def generate_resume_experience_from_analysis(
         request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
         reasoning_effort="low",
     )
+
+
+def generate_reachout_message(
+    *,
+    api_key: str,
+    job_description: str,
+    analysis_payload: dict,
+    current_resume_content: str = "",
+) -> dict:
+    compact_analysis = compact_analysis_for_reachout(analysis_payload)
+    resume_snapshot = extract_reachout_resume_snapshot(current_resume_content)
+    user_parts = [
+        f"Job description:\n{job_description.strip()}",
+        "Write one LinkedIn reachout message for a recruiter or hiring manager.",
+        "Keep it under 300 characters.",
+        "Use this style target exactly: short opener, compact candidate snapshot across a few short lines, direct ask, thanks.",
+        "Example shape: 'Hey <name>, keeping this short:' then 2-3 short lines of background, then 'I am highly interested in <company/role>. What can I do to get an interview? Thanks for your time!'",
+        "JD analysis:",
+        json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+    ]
+    if resume_snapshot["title"] or resume_snapshot["summary"]:
+        user_parts.append(
+            "Resume snapshot:\n" +
+            json.dumps(resume_snapshot, ensure_ascii=False, separators=(",", ":"))
+        )
+
+    parsed_payload = call_openai_structured_output(
+        api_key=api_key,
+        model=ANALYSIS_MODEL,
+        temperature=RESUME_TEMPERATURE,
+        developer_prompt=build_ai_reachout_prompt(),
+        user_prompt="\n\n".join(user_parts),
+        schema_name="reachout_generation",
+        schema=ai_reachout_schema(),
+        max_output_tokens=320,
+        request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
+        reasoning_effort="low",
+    )
+    parsed_payload["message"] = str(parsed_payload.get("message", "")).strip()
+    parsed_payload["char_count"] = len(parsed_payload["message"])
+    return parsed_payload
 
 
 def call_openai_resume_engine(
@@ -2150,6 +2297,76 @@ def generate_ai_experience():
         if 'session' in locals() and session.get("core_resume"):
             response["content"] = format_core_resume_text(session["core_resume"])
         return jsonify(response), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/ai/generate-reachout", methods=["POST"])
+def generate_ai_reachout():
+    try:
+        data = request.get_json() or {}
+        job_description = str(data.get("job_description", "")).strip()
+        current_resume_content = str(data.get("current_resume_content", "")).strip()
+        session_id = str(data.get("session_id", "")).strip() or None
+
+        if not job_description:
+            return jsonify({"success": False, "error": "Job description is required"}), 400
+
+        if not current_resume_content:
+            return jsonify({"success": False, "error": "Generate the resume first before creating a reachout message."}), 400
+
+        if not session_id or session_id not in ai_sessions:
+            return jsonify({"success": False, "error": "An active JD session is required before creating a reachout message."}), 400
+
+        session = ai_sessions[session_id]
+        analysis_payload = session.get("analysis")
+        if not analysis_payload:
+            return jsonify({"success": False, "error": "JD analysis is required before creating a reachout message."}), 400
+
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            return jsonify({"success": False, "error": "OPENAI_API_KEY is not configured"}), 500
+
+        started = time.perf_counter()
+        try:
+            reachout_payload = generate_reachout_message(
+                api_key=api_key,
+                job_description=job_description,
+                analysis_payload=analysis_payload,
+                current_resume_content=current_resume_content,
+            )
+        except Exception as exc:
+            raise AIStageError("reachout_generation", f"Reachout generation failed: {exc}", analysis=analysis_payload) from exc
+
+        timing = {"reachout_ms": int((time.perf_counter() - started) * 1000)}
+        timing["total_ms"] = timing["reachout_ms"]
+
+        issues = validate_reachout_payload(reachout_payload)
+        if issues:
+            raise AIStageError(
+                "reachout_generation",
+                "Reachout generation failed validation: " + " | ".join(issues[:3]),
+                analysis=analysis_payload,
+                timing=timing,
+            )
+
+        session["updated_at"] = time.time()
+
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "reachout": reachout_payload,
+            "timing": timing,
+        })
+    except AIStageError as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "stage": e.stage,
+            "analysis": e.analysis,
+            "timing": e.timing,
+            "session_id": session_id if 'session_id' in locals() else None,
+        }), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

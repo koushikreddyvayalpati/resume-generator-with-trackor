@@ -225,6 +225,7 @@ export default function App() {
   const [aiError, setAiError] = useState("");
   const [showGeneratedArea, setShowGeneratedArea] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
+  const [reachoutLoading, setReachoutLoading] = useState(false);
   const [aiStage, setAiStage] = useState("");
   const [previewEditMode, setPreviewEditMode] = useState(false);
   const [pdfState, setPdfState] = useState({
@@ -722,9 +723,48 @@ export default function App() {
   function handleComposerKeyDown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      if (!generatingAi) {
+      if (!generatingAi && !reachoutLoading) {
         submitAiGeneration();
       }
+    }
+  }
+
+  async function submitReachoutMessage() {
+    if (!lastGeneratedJd.trim() || !generatedContent.trim() || !aiSessionId) {
+      setAiError("Generate a resume first before creating a reachout message.");
+      return;
+    }
+
+    setReachoutLoading(true);
+    setAiError("");
+
+    try {
+      const data = await fetchJson("/api/ai/generate-reachout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_description: lastGeneratedJd,
+          current_resume_content: generatedContent,
+          session_id: aiSessionId,
+        }),
+      });
+
+      const reachout = data.reachout || {};
+      const message = (reachout.message || "").trim();
+      const charCount = Number.isFinite(reachout.char_count) ? reachout.char_count : message.length;
+
+      setAiThread((current) => [
+        ...current,
+        {
+          kind: "assistant",
+          title: "LinkedIn Reachout",
+          lines: [message, `${charCount} characters`],
+        },
+      ]);
+    } catch (error) {
+      setAiError(error.message || "Reachout generation failed.");
+    } finally {
+      setReachoutLoading(false);
     }
   }
 
@@ -793,6 +833,20 @@ export default function App() {
               </div>
             ) : null}
 
+            {reachoutLoading ? (
+              <div className="loading-card" aria-live="polite">
+                <div className="loading-card-header">Resume Engine</div>
+                <div className="loading-card-body">
+                  <div className="loading-dots">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                  <div className="loading-copy">Writing a short LinkedIn reachout...</div>
+                </div>
+              </div>
+            ) : null}
+
                 {showGeneratedArea ? (
                   <div className="chat-block">
                     <div className="message-label">
@@ -814,6 +868,13 @@ export default function App() {
               <div className="composer-toolbar">
                 <div className="composer-toolbar-left">
                   <button className="composer-pill" onClick={() => resetAiSession(true)}>New JD</button>
+                  <button
+                    className="composer-pill"
+                    disabled={!showGeneratedArea || !generatedContent.trim() || generatingAi || reachoutLoading}
+                    onClick={submitReachoutMessage}
+                  >
+                    {reachoutLoading ? "Writing..." : "Reachout"}
+                  </button>
                 </div>
                 <div className="composer-toolbar-right">
                   <span className="composer-state">
@@ -828,7 +889,7 @@ export default function App() {
                   </button>
                   <button
                     className="composer-send-button"
-                    disabled={generatingAi}
+                    disabled={generatingAi || reachoutLoading}
                     onClick={submitAiGeneration}
                     aria-label={showGeneratedArea ? "Update draft" : "Generate content"}
                   >
