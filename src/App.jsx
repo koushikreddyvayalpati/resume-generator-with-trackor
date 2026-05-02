@@ -203,6 +203,12 @@ function parseProjects(text) {
     .filter((project) => project.name);
 }
 
+function combineCoreDraft(titleSummaryContent, skillsContent) {
+  return [titleSummaryContent?.trim(), skillsContent?.trim(), "Professional Experience"]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export default function App() {
   const [profile, setProfile] = useState(emptyProfile);
   const [profileDraft, setProfileDraft] = useState(emptyProfile);
@@ -552,50 +558,73 @@ export default function App() {
       setAiSessionId(nextSessionId);
       setLastGeneratedJd(jd);
       setMemoryCount(analyzeData.memory_count || 0);
+      if ((analyzeData.analysis?.company_name || "").trim()) {
+        setCompanyName((current) => current.trim() || analyzeData.analysis.company_name.trim());
+      }
       setAiThread([...baseThread, soulThreadEntry(analyzeData.analysis)]);
       setShowGeneratedArea(true);
       setPreviewEditMode(false);
       setTab("parsed");
 
       setAiStage("core");
-      const coreData = await fetchJson("/api/ai/generate-core", {
+      const [titleSummaryData, skillsData] = await Promise.all([
+        fetchJson("/api/ai/generate-title-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: nextSessionId }),
+        }),
+        fetchJson("/api/ai/generate-skills", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: nextSessionId }),
+        }),
+      ]);
+
+      const sessionAfterCore = titleSummaryData.session_id || skillsData.session_id || nextSessionId;
+      const coreContent = combineCoreDraft(titleSummaryData.content, skillsData.content);
+      setAiSessionId(sessionAfterCore);
+      setShowGeneratedArea(true);
+      setGeneratedContent(coreContent);
+      const reviewedCoreData = await fetchJson("/api/ai/review-core", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          job_description: jd,
-          revision_request: revisionRequest,
-          current_resume_content: generatedContent,
-          session_id: nextSessionId,
-          reset_memory: false,
-        }),
+        body: JSON.stringify({ session_id: sessionAfterCore }),
       });
 
-      const sessionAfterCore = coreData.session_id || nextSessionId;
-      setAiSessionId(sessionAfterCore);
-      setMemoryCount(coreData.memory_count || 0);
-      setGeneratedContent(coreData.content || "");
-      setShowGeneratedArea(true);
+      const sessionAfterReview = reviewedCoreData.session_id || sessionAfterCore;
+      const reviewedCoreContent = reviewedCoreData.content || coreContent;
+      setAiSessionId(sessionAfterReview);
+      setGeneratedContent(reviewedCoreContent);
       setAiThread((current) => [
         ...current,
-        { kind: "assistant", title: "Core Draft Ready", lines: ["Summary and technical skills are ready. Professional experience is still generating."] },
+        {
+          kind: "assistant",
+          title: reviewedCoreData.revised ? "Core Draft Refined" : "Core Draft Ready",
+          lines: [
+            reviewedCoreData.revised
+              ? "Summary and technical skills were tightened before professional experience generation."
+              : "Summary and technical skills are ready. Professional experience is still generating.",
+          ],
+        },
       ]);
 
       setAiStage("experience");
-      const experienceData = await fetchJson("/api/ai/generate-experience", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          job_description: jd,
-          revision_request: revisionRequest,
-          current_resume_content: coreData.content || generatedContent,
-          session_id: sessionAfterCore,
-          reset_memory: false,
+      const [recentExperienceData, olderExperienceData] = await Promise.all([
+        fetchJson("/api/ai/generate-experience-recent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionAfterReview }),
         }),
-      });
+        fetchJson("/api/ai/generate-experience-older", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionAfterReview }),
+        }),
+      ]);
 
-      setAiSessionId(experienceData.session_id || sessionAfterCore || null);
-      setMemoryCount(experienceData.memory_count || 0);
-      setGeneratedContent(experienceData.content || coreData.content || "");
+      const finalExperienceData = recentExperienceData.complete ? recentExperienceData : olderExperienceData;
+      setAiSessionId(finalExperienceData.session_id || sessionAfterReview || null);
+      setGeneratedContent(finalExperienceData.content || reviewedCoreContent);
       setShowGeneratedArea(true);
       setComposerInput("");
       setTab("parsed");
@@ -619,6 +648,9 @@ export default function App() {
 
       const stageNames = {
         analysis: "JD analysis failed",
+        title_summary_generation: "Title and summary generation failed",
+        skills_generation: "Skills generation failed",
+        core_review: "Summary and skills review failed",
         core_generation: "Core resume generation failed",
         experience_generation: "Experience generation failed",
         resume_generation: "Resume generation failed",

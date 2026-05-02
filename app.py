@@ -65,8 +65,11 @@ RESUME_MODEL = os.getenv("OPENAI_RESUME_MODEL", "gpt-5-mini")
 ANALYSIS_TEMPERATURE = 0.2
 RESUME_TEMPERATURE = 0.4
 AI_MEMORY_LIMIT = 2
-ANALYSIS_MAX_OUTPUT_TOKENS = 3800
+ANALYSIS_MAX_OUTPUT_TOKENS = 2400
 RESUME_MAX_OUTPUT_TOKENS = 7800
+SMALL_OUTPUT_HEADROOM = 200
+MEDIUM_OUTPUT_HEADROOM = 300
+LARGE_OUTPUT_HEADROOM = 500
 OPENAI_ANALYSIS_TIMEOUT_SECONDS = int(os.getenv("OPENAI_ANALYSIS_TIMEOUT_SECONDS", "120"))
 OPENAI_RESUME_TIMEOUT_SECONDS = int(os.getenv("OPENAI_RESUME_TIMEOUT_SECONDS", "180"))
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
@@ -194,6 +197,10 @@ class AIStageError(RuntimeError):
         self.analysis = analysis
         self.timing = timing or {}
 
+
+def with_output_headroom(base_tokens: int, extra_tokens: int) -> int:
+    return max(1, int(base_tokens) + int(extra_tokens))
+
 # Cache PDF conversion status check (checked once, reused for 1 hour)
 _pdf_status_cache = {"result": None, "timestamp": 0}
 
@@ -266,7 +273,11 @@ def get_ai_session(session_id: str | None, job_description: str, reset_memory: b
             "job_description": job_description,
             "turns": [],
             "analysis": None,
+            "title_summary": None,
+            "skills": None,
             "core_resume": None,
+            "experience_recent": None,
+            "experience_older": None,
             "created_at": time.time(),
             "updated_at": time.time(),
         }
@@ -278,7 +289,11 @@ def get_ai_session(session_id: str | None, job_description: str, reset_memory: b
         session["job_description"] = job_description
         session["turns"] = []
         session["analysis"] = None
+        session["title_summary"] = None
+        session["skills"] = None
         session["core_resume"] = None
+        session["experience_recent"] = None
+        session["experience_older"] = None
     session["updated_at"] = time.time()
     return session_id, session
 
@@ -311,17 +326,61 @@ def compact_analysis_for_generation(analysis_payload: dict) -> dict:
         return result
 
     return {
+        "company_name": str(analysis_payload.get("company_name", "")).strip(),
+        "company_description": str(analysis_payload.get("company_description", "")).strip(),
+        "company_domain": str(analysis_payload.get("company_domain", "")).strip(),
+        "culture_signals": compact_list(analysis_payload.get("culture_signals", []), 4),
         "target_role": str(analysis_payload.get("target_role", "")).strip(),
+        "role_family": str(analysis_payload.get("role_family", "")).strip(),
         "core_problem": str(analysis_payload.get("core_problem", "")).strip(),
+        "hire_problem": str(analysis_payload.get("hire_problem", "")).strip(),
+        "desired_outcomes": compact_list(analysis_payload.get("desired_outcomes", []), 4),
         "system_description": str(analysis_payload.get("system_description", "")).strip(),
         "responsibilities": compact_list(analysis_payload.get("responsibilities", []), 5),
         "workflows": compact_list(analysis_payload.get("workflows", []), 5),
         "core_skills": compact_list(analysis_payload.get("core_skills", []), 8),
         "supporting_skills": compact_list(analysis_payload.get("supporting_skills", []), 10),
+        "primary_stack_signals": compact_list(analysis_payload.get("primary_stack_signals", []), 6),
+        "supporting_stack_signals": compact_list(analysis_payload.get("supporting_stack_signals", []), 6),
+        "must_have_skills": compact_list(analysis_payload.get("must_have_skills", []), 6),
+        "nice_to_have_skills": compact_list(analysis_payload.get("nice_to_have_skills", []), 5),
+        "skills_emphasis": compact_list(analysis_payload.get("skills_emphasis", []), 5),
+        "skills_cautions": compact_list(analysis_payload.get("skills_cautions", []), 5),
         "behavioral_signals": compact_list(analysis_payload.get("behavioral_signals", []), 5),
         "gaps": compact_list(analysis_payload.get("gaps", []), 5),
         "build_strategy": compact_list(analysis_payload.get("build_strategy", []), 6),
     }
+
+
+def compact_analysis_for_reachout(analysis_payload: dict) -> dict:
+    compact = compact_analysis_for_generation(analysis_payload)
+    return {
+        "company_name": compact.get("company_name", ""),
+        "target_role": compact.get("target_role", ""),
+        "core_problem": compact.get("core_problem", ""),
+        "core_skills": compact.get("core_skills", [])[:4],
+        "behavioral_signals": compact.get("behavioral_signals", [])[:3],
+    }
+
+
+def extract_reachout_resume_snapshot(current_resume_content: str) -> dict:
+    text = str(current_resume_content or "").strip()
+    title = ""
+    summary = ""
+
+    title_match = re.search(r"Updated Title\s*\n+(.+)", text, re.IGNORECASE)
+    if title_match:
+        title = title_match.group(1).strip()
+
+    summary_match = re.search(
+        r"Updated Summary\s*\n+(.+?)(?:\n\s*\n(?:Updated Skills|Professional Experience)\b|\Z)",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if summary_match:
+        summary = re.sub(r"\s+", " ", summary_match.group(1)).strip()
+
+    return {"title": title, "summary": summary}
 
 
 def normalize_skill_item_text(item: str) -> str:
@@ -426,41 +485,13 @@ def normalize_updated_skills(skills_payload: list[dict]) -> list[dict]:
 def build_ai_analysis_prompt() -> str:
     return "\n".join(
         [
-            "You are a resume reconstruction engine with senior-level judgment.",
-            "Always assume the candidate has 4+ years of experience.",
-            "Your job is to analyze the JD first and identify the real engineering problem before any resume writing happens.",
-            "The goal of this analysis is to help build a resume that wins a recruiter's first scan by showing believable fit fast.",
-            "Do not mirror the JD. Do not keyword-match blindly. Infer the system, workflow, operating model, success model, and hiring signals behind the role.",
-            "Do not invent unsupported domain expertise. If something cannot be defended in a real interview, treat it as a gap, not a fact.",
-            "Keep the analysis precise, production-level, ATS-aware, and grounded in believable engineering systems.",
-            "Treat ATS as a compatibility constraint, not the primary audience. Recruiters and hiring managers are the real readers.",
-            "Return only structured analysis matching the required schema.",
-            "",
-            "Visible JD intelligence must extract all of the following in structured form:",
-            "- target_role: the most accurate role framing in plain engineering terms",
-            "- core_problem: the real business and engineering problem being solved",
-            "- system_description: the actual platform, service, or system implied by the JD",
-            "- responsibilities: concrete responsibility areas, not copied keyword lists",
-            "- workflows: the end-to-end workflows this role owns or influences",
-            "- core_skills: must-have skills or tools directly implied by the problem and system",
-            "- supporting_skills: supporting skills, tools, and technologies derived from system behavior, not raw keyword copying",
-            "- behavioral_signals: ownership, ambiguity tolerance, technical leadership, or collaboration signals",
-            "- gaps: what should not be invented from thin air",
-            "- build_strategy: how the resume should pivot transferable work to align credibly with this role, including what to emphasize first",
-            "",
-            "Derivation rule:",
-            "- Ask what is required to build, run, scale, monitor, secure, and debug this system.",
-            "- Use that reasoning to derive supporting skills and the build strategy.",
-            "- Supporting skills must be explicit and practical, not generic filler. Include the capabilities that make the core system operable in production.",
-            "- Do not return only the obvious JD skills. Return the surrounding system skills that a strong engineer would need to actually deliver the role.",
-            "- Extract ATS-relevant terminology naturally: the role title, system types, must-have capabilities, and the important technical language a recruiter or ATS would expect to see.",
-            "- Separate core JD-facing language from the supporting operating language needed to make the system credible.",
-            "- Distinguish essential requirements from supporting or nice-to-have signals, even if the JD does not label them clearly.",
-            "- Think in terms of resume emphasis: what should be highlighted most strongly in the top summary and recent experience, and what should be kept lighter.",
-            "",
-            "Final expectation:",
-            "- The analysis must reveal the soul of the JD clearly enough that the resume can be built from it without keyword stuffing.",
-            "- The analysis should make it obvious how to tailor by emphasis and ordering, not by rewriting history.",
+            "You are a resume role analyzer.",
+            "Assume the candidate has 4+ years of experience.",
+            "Analyze the JD and return a compact role model for downstream resume generation.",
+            "Do not mirror the JD or invent unsupported domain expertise.",
+            "Infer the company context, role family, problem, system, stack signals, must-have skills, nice-to-have signals, behavior, and resume emphasis.",
+            "Treat must-have and nice-to-have as signals, not final resume text.",
+            "Return only structured analysis matching the schema.",
         ]
     )
 
@@ -743,6 +774,79 @@ def build_ai_resume_core_prompt() -> str:
     )
 
 
+def build_ai_resume_title_summary_prompt() -> str:
+    return "\n".join(
+        [
+            "You are a resume reconstruction engine.",
+            "Build only Updated Title and Updated Summary.",
+            "Assume the candidate has 4+ years of experience.",
+            "Use the analysis object as the source of truth.",
+            "Do not copy JD wording or invent expertise.",
+            "",
+            "TITLE:",
+            f"- {TITLE_WORD_MIN}-{TITLE_WORD_MAX} words",
+            "- natural human title",
+            "- preserve seniority when clearly signaled",
+            "- stay close to a clean JD title",
+            "- do not turn tool names into the title",
+            "",
+            "SUMMARY:",
+            f"- {SUMMARY_WORD_MIN}-{SUMMARY_WORD_MAX} words",
+            "- build from the company problem, hire problem, target system, and strongest transferable evidence",
+            "- include systems, technologies, and problems solved",
+            "- do not state an explicit years-of-experience count unless it is clearly safe and helpful",
+            "- align to the company's domain without overclaiming direct domain expertise",
+            "- do not echo company marketing language, product slogans, or copied business phrasing from the JD",
+            "- prefer transferable product and workflow framing over company-specific wording when the domain match is only adjacent",
+            "- adapt by role family and culture signals",
+            "- platform roles: emphasize systems, reliability, APIs, scale",
+            "- backend delivery roles: emphasize ownership, execution, architecture",
+            "- customer-facing solutions roles: emphasize integrations, troubleshooting, technical communication",
+            "",
+            "Return only the final result matching the schema.",
+        ]
+    )
+
+
+def build_ai_resume_skills_prompt() -> str:
+    return "\n".join(
+        [
+            "You are a resume reconstruction engine.",
+            "Build only Updated Skills.",
+            "Assume the candidate has 4+ years of experience.",
+            "Use the analysis object as the source of truth.",
+            "Convert role signals into a believable candidate-shaped skills section.",
+            "Do not copy JD skill lists directly. Use them as signals.",
+            "Use primary stack signals strongly, supporting stack signals second, must-have skills strongly, and nice-to-have skills lightly.",
+            "",
+            "SKILLS:",
+            "- use only allowed categories",
+            "- exactly one category per line",
+            "- each item must be one short skill or capability",
+            "- no slashes, brackets, or qualifier text",
+            "- keep the primary stack visible",
+            "- include supporting technologies and broader engineering capabilities",
+            "- consider nice-to-have signals lightly; do not force them",
+            "- prefer concrete technologies when the JD is explicit",
+            "- do not use vague filler phrases like 'data-driven solutions' or 'AI feature integration' when a concrete tool or capability is more accurate",
+            "- if a production language or framework is clearly central to the role signals, prefer naming it directly instead of replacing it with an abstract capability",
+            "- if a tool appears only as a nice-to-have signal, include it only when it still feels believable and proportionate",
+            "- prefer concrete categories such as Data & Storage, System Design & Performance, and Testing & Quality over generic mixed buckets",
+            "- put databases, storage engines, indexing, and query tuning under Data & Storage",
+            "- put RAG, prompt engineering, vector databases, and LLM integration under AI & LLM Systems when supported by the role signals",
+            "- if AI experience is only a supporting signal, keep the AI category modest and concrete instead of making it dominate the section",
+            "- do not repeat the same concept across categories",
+            "- expected pattern:",
+            "  - Programming Languages: JavaScript, TypeScript, Python",
+            "  - Backend Engineering: Node.js, REST API design, Service architecture",
+            "  - Data & Storage: MySQL, Schema design, Query optimization",
+            "  - Testing & Quality: Cypress, Integration testing, Debugging",
+            "",
+            "Return only the final result matching the schema.",
+        ]
+    )
+
+
 def build_ai_resume_experience_prompt() -> str:
     blueprint_lines = []
     for blueprint in EXPERIENCE_BLUEPRINTS:
@@ -804,14 +908,78 @@ def build_ai_resume_experience_prompt() -> str:
     )
 
 
+def build_ai_resume_experience_subset_prompt(blueprints: list[dict]) -> str:
+    blueprint_lines = []
+    for blueprint in blueprints:
+        bullet_rule = f"{blueprint['bullet_min']}" if blueprint["bullet_min"] == blueprint["bullet_max"] else f"{blueprint['bullet_min']}-{blueprint['bullet_max']}"
+        blueprint_lines.append(
+            f"- {blueprint['key']} | {blueprint['company']} | {blueprint['location']} | {blueprint['dates']} | bullets: {bullet_rule} | anchor: {blueprint['anchor']}"
+        )
+
+    return "\n".join(
+        [
+            "You are a resume reconstruction engine.",
+            "Build only the Professional Experience entries requested.",
+            "Assume the candidate has 4+ years of experience.",
+            "Use the analysis object and selected skills as the source of truth.",
+            "Do not mirror the JD or invent unrealistic expertise.",
+            "Tailor by emphasis, not by rewriting history.",
+            "",
+            "RULES:",
+            "- follow the fixed company, location, and date structure exactly",
+            "- keep historical titles believable",
+            "- do not rewrite titles to imitate the target role",
+            "- recent roles should sell harder than older roles",
+            "- each bullet must be 25-30 words",
+            "",
+            "BULLET DESIGN:",
+            "- the first bullet under each company is a simple summary bullet in plain language",
+            "- the first bullet must be 25-40 words; the ideal range is 25-30 words",
+            "- the first bullet should describe the role and scope clearly without becoming dense",
+            "- do not make the first bullet shorter than 25 words",
+            "- do not treat the first bullet like a compact fragment; write it as a full accomplishment sentence",
+            "- all later bullets should follow:",
+            "  - What: the skill, keyword, or qualification",
+            "  - How: how it was used",
+            "  - Why: why it mattered or what changed",
+            "",
+            "BULLET FORMULA:",
+            "[Strong Verb] + [System or workflow] + using [1-3 tools] + under [constraint or engineering decision] + resulting in [measurable impact].",
+            "",
+            "Each bullet must include:",
+            "- real system or workflow context",
+            "- 1-3 tools or technical skills from the selected skills or supporting stack",
+            "- a constraint or engineering decision",
+            "- a measurable metric",
+            "- selected skills should guide the stack used in bullets; do not invent a different stack from the skills section",
+            "- older roles should use the lighter, earlier-career portion of the selected skills instead of inheriting the most modern or specialized parts of the stack",
+            "- keep KPMG and Trigent technology choices believable for 2020-2022, their company anchors, and normal exposure progression",
+            "- do not backfill newer tools, AI frameworks, or unusually convenient target-stack substitutions into older roles unless the anchor strongly supports them",
+            "",
+            "Keep each company as one coherent project story.",
+            "Prefer believable metrics over suspicious precision.",
+            "Keep company sections realistic to their role family and time period.",
+            "",
+            "Fixed experience blueprints:",
+            *blueprint_lines,
+            "",
+            "Return only the final result matching the schema.",
+        ]
+    )
+
+
 def build_ai_reachout_prompt() -> str:
     return "\n".join(
         [
             "You write concise LinkedIn reachout notes for engineering candidates.",
             "Write one short message under 300 characters total.",
             "Use a compact, warm, high-signal style.",
-            "Match this structure closely: short opener, 2-3 compact candidate lines, direct ask, brief thanks.",
-            "Prefer line breaks over long sentences.",
+            "Do not write one dense paragraph.",
+            "Use exactly 4 short lines separated by single line breaks.",
+            "Line 1: greeting with name, then 'keeping this short'.",
+            "Line 2: one short introduction line about the candidate.",
+            "Line 3: one short fit line tied to role-relevant skills or product fit.",
+            "Line 4: direct ask for an interview and brief thanks.",
             "Keep each line short and punchy.",
             "Use only facts grounded in the provided resume and JD.",
             "Do not invent companies, internships, metrics, or domain expertise.",
@@ -822,30 +990,88 @@ def build_ai_reachout_prompt() -> str:
     )
 
 
+def build_ai_core_review_prompt() -> str:
+    return "\n".join(
+        [
+            "You review only the resume summary and skills section for a tailored software-engineering resume.",
+            "Use the analysis object as the source of truth.",
+            "Judge whether the current summary and skills are ready to keep or should be revised.",
+            "Focus on two risks:",
+            "- summary that sounds copied from company or JD wording, too generic, or mis-emphasized for the role",
+            "- skills that are too vague, too copied, missing obvious concrete stack, or awkwardly categorized",
+            "Do not review professional experience.",
+            "Be concise and practical.",
+            "Return only the final result matching the schema.",
+        ]
+    )
+
+
+def build_ai_core_correction_prompt() -> str:
+    return "\n".join(
+        [
+            "You refine only the resume summary and skills section for a tailored software-engineering resume.",
+            "Use the analysis object and current draft as the source of truth.",
+            "Keep the title unchanged outside the schema; only return Updated Summary and Updated Skills.",
+            "Inspect the current summary and skills, improve them only if needed, and otherwise keep them close to the draft.",
+            "Focus on sharper role emphasis, cleaner summary phrasing, and more concrete, believable skills.",
+            "If the summary mentions years of experience at all, it must say 4+ years and never anything higher.",
+            "Do not copy JD wording directly.",
+            "Do not touch professional experience.",
+            "Return only the final result matching the schema.",
+        ]
+    )
+
+
 def ai_analysis_schema() -> dict:
     return {
         "type": "object",
         "additionalProperties": False,
         "properties": {
+            "company_name": {"type": "string"},
+            "company_description": {"type": "string"},
+            "company_domain": {"type": "string"},
+            "culture_signals": {"type": "array", "items": {"type": "string"}},
             "target_role": {"type": "string"},
+            "role_family": {"type": "string"},
             "core_problem": {"type": "string"},
+            "hire_problem": {"type": "string"},
+            "desired_outcomes": {"type": "array", "items": {"type": "string"}},
             "system_description": {"type": "string"},
             "responsibilities": {"type": "array", "items": {"type": "string"}},
             "workflows": {"type": "array", "items": {"type": "string"}},
             "core_skills": {"type": "array", "items": {"type": "string"}},
             "supporting_skills": {"type": "array", "items": {"type": "string"}},
+            "primary_stack_signals": {"type": "array", "items": {"type": "string"}},
+            "supporting_stack_signals": {"type": "array", "items": {"type": "string"}},
+            "must_have_skills": {"type": "array", "items": {"type": "string"}},
+            "nice_to_have_skills": {"type": "array", "items": {"type": "string"}},
+            "skills_emphasis": {"type": "array", "items": {"type": "string"}},
+            "skills_cautions": {"type": "array", "items": {"type": "string"}},
             "behavioral_signals": {"type": "array", "items": {"type": "string"}},
             "gaps": {"type": "array", "items": {"type": "string"}},
             "build_strategy": {"type": "array", "items": {"type": "string"}},
         },
         "required": [
+            "company_name",
+            "company_description",
+            "company_domain",
+            "culture_signals",
             "target_role",
+            "role_family",
             "core_problem",
+            "hire_problem",
+            "desired_outcomes",
             "system_description",
             "responsibilities",
             "workflows",
             "core_skills",
             "supporting_skills",
+            "primary_stack_signals",
+            "supporting_stack_signals",
+            "must_have_skills",
+            "nice_to_have_skills",
+            "skills_emphasis",
+            "skills_cautions",
             "behavioral_signals",
             "gaps",
             "build_strategy",
@@ -950,10 +1176,87 @@ def ai_resume_core_schema() -> dict:
     }
 
 
+def ai_title_summary_schema() -> dict:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "updated_title": {"type": "string"},
+            "updated_summary": {"type": "string"},
+        },
+        "required": ["updated_title", "updated_summary"],
+    }
+
+
+def ai_skills_schema() -> dict:
+    allowed_skill_categories = sorted(ALLOWED_SKILL_CATEGORIES)
+    skill_item_schema = {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 48,
+        "pattern": r"^[A-Za-z0-9+#.&' -]+$",
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "updated_skills": {
+                "type": "array",
+                "minItems": 6,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "category": {"type": "string", "enum": allowed_skill_categories},
+                        "items": {"type": "array", "items": skill_item_schema, "minItems": 2},
+                    },
+                    "required": ["category", "items"],
+                },
+            },
+        },
+        "required": ["updated_skills"],
+    }
+
+
 def ai_experience_schema() -> dict:
     experience_properties = {}
     required_experience_keys = []
     for blueprint in EXPERIENCE_BLUEPRINTS:
+        experience_properties[blueprint["key"]] = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string"},
+                "bullets": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "minItems": blueprint["bullet_min"],
+                    "maxItems": blueprint["bullet_max"],
+                },
+            },
+            "required": ["title", "bullets"],
+        }
+        required_experience_keys.append(blueprint["key"])
+
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "experience": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": experience_properties,
+                "required": required_experience_keys,
+            },
+        },
+        "required": ["experience"],
+    }
+
+
+def ai_experience_subset_schema(blueprints: list[dict]) -> dict:
+    experience_properties = {}
+    required_experience_keys = []
+    for blueprint in blueprints:
         experience_properties[blueprint["key"]] = {
             "type": "object",
             "additionalProperties": False,
@@ -994,6 +1297,51 @@ def ai_reachout_schema() -> dict:
             "char_count": {"type": "integer"},
         },
         "required": ["message", "char_count"],
+    }
+
+
+def ai_core_review_schema() -> dict:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "summary_status": {"type": "string", "enum": ["keep", "revise"]},
+            "skills_status": {"type": "string", "enum": ["keep", "revise"]},
+            "summary_notes": {"type": "string"},
+            "skills_notes": {"type": "string"},
+        },
+        "required": ["summary_status", "skills_status", "summary_notes", "skills_notes"],
+    }
+
+
+def ai_core_correction_schema() -> dict:
+    allowed_skill_categories = sorted(ALLOWED_SKILL_CATEGORIES)
+    skill_item_schema = {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 48,
+        "pattern": r"^[A-Za-z0-9+#.&' -]+$",
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "updated_summary": {"type": "string"},
+            "updated_skills": {
+                "type": "array",
+                "minItems": 6,
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "category": {"type": "string", "enum": allowed_skill_categories},
+                        "items": {"type": "array", "items": skill_item_schema, "minItems": 2},
+                    },
+                    "required": ["category", "items"],
+                },
+            },
+        },
+        "required": ["updated_summary", "updated_skills"],
     }
 
 
@@ -1093,6 +1441,36 @@ def format_core_resume_text(core_payload: dict) -> str:
     return "\n".join(lines).strip()
 
 
+def format_title_summary_text(payload: dict) -> str:
+    return "\n".join(
+        [
+            "Updated Title",
+            str(payload.get("updated_title", "")).strip(),
+            "",
+            "Updated Summary",
+            str(payload.get("updated_summary", "")).strip(),
+        ]
+    ).strip()
+
+
+def format_skills_text(payload: dict) -> str:
+    normalized_skills = normalize_updated_skills(payload.get("updated_skills", []))
+    lines = ["Updated Skills"]
+    for skill in normalized_skills:
+        items = [item.strip() for item in skill.get("items", []) if item.strip()]
+        if items:
+            lines.append(f"{skill['category'].strip()}: {', '.join(items)}.")
+    return "\n".join(lines).strip()
+
+
+def merge_core_sections(title_summary_payload: dict, skills_payload: dict) -> dict:
+    return {
+        "updated_title": str(title_summary_payload.get("updated_title", "")).strip(),
+        "updated_summary": str(title_summary_payload.get("updated_summary", "")).strip(),
+        "updated_skills": normalize_updated_skills(skills_payload.get("updated_skills", [])),
+    }
+
+
 def merge_resume_payloads(core_payload: dict, experience_payload: dict) -> dict:
     return {
         "updated_title": core_payload.get("updated_title", ""),
@@ -1133,6 +1511,34 @@ def extract_output_text(response_payload: dict) -> str:
     raise RuntimeError("OpenAI API returned no text output")
 
 
+def _post_openai_payload(
+    *,
+    api_key: str,
+    payload: dict,
+    request_timeout_seconds: int,
+) -> dict:
+    req = urllib.request.Request(
+        OPENAI_API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=request_timeout_seconds) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"OpenAI API error ({exc.code}): {body}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"OpenAI API request failed: {exc.reason}") from exc
+    except (TimeoutError, socket.timeout) as exc:
+        raise RuntimeError(f"OpenAI API request timed out after {request_timeout_seconds}s") from exc
+
+
 def call_openai_structured_output(
     *,
     api_key: str,
@@ -1168,27 +1574,11 @@ def call_openai_structured_output(
 
     if reasoning_effort and model.startswith("gpt-5"):
         payload["reasoning"] = {"effort": reasoning_effort}
-
-    req = urllib.request.Request(
-        OPENAI_API_URL,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
+    response_payload = _post_openai_payload(
+        api_key=api_key,
+        payload=payload,
+        request_timeout_seconds=request_timeout_seconds,
     )
-
-    try:
-        with urllib.request.urlopen(req, timeout=request_timeout_seconds) as response:
-            response_payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"OpenAI API error ({exc.code}): {body}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"OpenAI API request failed: {exc.reason}") from exc
-    except (TimeoutError, socket.timeout) as exc:
-        raise RuntimeError(f"OpenAI API request timed out after {request_timeout_seconds}s") from exc
 
     status = str(response_payload.get("status", "")).strip()
     if status and status != "completed":
@@ -1201,6 +1591,39 @@ def call_openai_structured_output(
         return json.loads(output_text)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Failed to parse model output JSON: {exc}") from exc
+
+
+def call_openai_text_output(
+    *,
+    api_key: str,
+    model: str,
+    temperature: float,
+    developer_prompt: str,
+    user_prompt: str,
+    max_output_tokens: int,
+    request_timeout_seconds: int,
+    reasoning_effort: str = "low",
+) -> str:
+    payload = {
+        "model": model,
+        "input": [
+            {"role": "developer", "content": developer_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "max_output_tokens": max_output_tokens,
+    }
+
+    if temperature is not None and model.startswith("gpt-4o"):
+        payload["temperature"] = temperature
+
+    if reasoning_effort and model.startswith("gpt-5"):
+        payload["reasoning"] = {"effort": reasoning_effort}
+    response_payload = _post_openai_payload(
+        api_key=api_key,
+        payload=payload,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+    return extract_output_text(response_payload)
 
 
 def count_words(text: str) -> int:
@@ -1371,6 +1794,71 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
     return issues
 
 
+def validate_title_summary_payload(title_summary_payload: dict, *, summary_max_buffer: int = 0) -> list[str]:
+    issues: list[str] = []
+    title = str(title_summary_payload.get("updated_title", "")).strip()
+    summary = str(title_summary_payload.get("updated_summary", "")).strip()
+    title_word_count = count_words(title)
+    summary_word_count = count_words(summary)
+
+    if not title:
+        issues.append("Updated title is empty.")
+    elif not (TITLE_WORD_MIN <= title_word_count <= TITLE_WORD_MAX):
+        issues.append(f"Updated title must be {TITLE_WORD_MIN}-{TITLE_WORD_MAX} words; got {title_word_count}.")
+
+    if not summary:
+        issues.append("Updated summary is empty.")
+    else:
+        summary_word_max = SUMMARY_WORD_MAX + max(summary_max_buffer, 0)
+        if not (SUMMARY_WORD_MIN <= summary_word_count <= summary_word_max):
+            if summary_word_max == SUMMARY_WORD_MAX:
+                issues.append(f"Updated summary must be {SUMMARY_WORD_MIN}-{SUMMARY_WORD_MAX} words; got {summary_word_count}.")
+            else:
+                issues.append(
+                    f"Updated summary must be {SUMMARY_WORD_MIN}-{SUMMARY_WORD_MAX} words; buffer allows up to {summary_word_max}. Got {summary_word_count}."
+                )
+
+    return issues
+
+
+def validate_skills_only_payload(skills_payload: dict, analysis_payload: dict) -> list[str]:
+    issues: list[str] = []
+    skills = normalize_updated_skills(skills_payload.get("updated_skills") or [])
+    if len(skills) < 6:
+        issues.append("Updated skills must contain at least 6 categories.")
+    seen_categories: set[str] = set()
+    for entry in skills:
+        category = str(entry.get("category", "")).strip()
+        items = expand_skill_items(entry.get("items", []))
+        if not category:
+            issues.append("A skills category is empty.")
+            continue
+        if category in seen_categories:
+            issues.append(f"Duplicate skills category: {category}.")
+        seen_categories.add(category)
+        if category not in ALLOWED_SKILL_CATEGORIES:
+            issues.append(f"Unsupported skills category: {category}.")
+        if len(items) < 2:
+            issues.append(f"Skills category '{category}' must contain at least 2 skills.")
+    if not analysis_payload.get("core_problem"):
+        issues.append("Analysis is missing core_problem.")
+    return issues
+
+
+def validate_experience_subset_payload(experience_payload: dict, blueprints: list[dict]) -> list[str]:
+    issues: list[str] = []
+    experience = experience_payload.get("experience") or {}
+    for blueprint in blueprints:
+        entry = experience.get(blueprint["key"]) or {}
+        role_title = str(entry.get("title", "")).strip()
+        bullets = [str(bullet).strip() for bullet in entry.get("bullets", []) if str(bullet).strip()]
+        if not role_title:
+            issues.append(f"{blueprint['company']} is missing a role title.")
+        if not (blueprint["bullet_min"] <= len(bullets) <= blueprint["bullet_max"]):
+            issues.append(f"{blueprint['company']} must have {blueprint['bullet_min']}-{blueprint['bullet_max']} bullets.")
+    return issues
+
+
 def validate_reachout_payload(reachout_payload: dict) -> list[str]:
     issues: list[str] = []
     message = str(reachout_payload.get("message", "")).strip()
@@ -1410,9 +1898,9 @@ def analyze_job_description(
         user_prompt="\n\n".join(analysis_user_parts),
         schema_name="jd_analysis",
         schema=ai_analysis_schema(),
-        max_output_tokens=ANALYSIS_MAX_OUTPUT_TOKENS,
+        max_output_tokens=with_output_headroom(ANALYSIS_MAX_OUTPUT_TOKENS, MEDIUM_OUTPUT_HEADROOM),
         request_timeout_seconds=OPENAI_ANALYSIS_TIMEOUT_SECONDS,
-        reasoning_effort="medium",
+        reasoning_effort="low",
     )
 
 
@@ -1447,7 +1935,7 @@ def generate_resume_from_analysis(
         user_prompt="\n\n".join(resume_user_parts),
         schema_name="resume_generation",
         schema=ai_resume_schema(),
-        max_output_tokens=RESUME_MAX_OUTPUT_TOKENS,
+        max_output_tokens=with_output_headroom(RESUME_MAX_OUTPUT_TOKENS, LARGE_OUTPUT_HEADROOM),
         request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
         reasoning_effort="low",
     )
@@ -1484,7 +1972,115 @@ def generate_resume_core_from_analysis(
         user_prompt="\n\n".join(user_parts),
         schema_name="resume_core_generation",
         schema=ai_resume_core_schema(),
-        max_output_tokens=6500,
+        max_output_tokens=with_output_headroom(6500, LARGE_OUTPUT_HEADROOM),
+        request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
+        reasoning_effort="low",
+    )
+
+
+def generate_title_summary_from_analysis(
+    *,
+    api_key: str,
+    analysis_payload: dict,
+) -> dict:
+    compact_analysis = compact_analysis_for_generation(analysis_payload)
+    return call_openai_structured_output(
+        api_key=api_key,
+        model=RESUME_MODEL,
+        temperature=RESUME_TEMPERATURE,
+        developer_prompt=build_ai_resume_title_summary_prompt(),
+        user_prompt="Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        schema_name="resume_title_summary_generation",
+        schema=ai_title_summary_schema(),
+        max_output_tokens=with_output_headroom(2200, SMALL_OUTPUT_HEADROOM),
+        request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
+        reasoning_effort="low",
+    )
+
+
+def generate_skills_from_analysis(
+    *,
+    api_key: str,
+    analysis_payload: dict,
+) -> dict:
+    compact_analysis = compact_analysis_for_generation(analysis_payload)
+    return call_openai_structured_output(
+        api_key=api_key,
+        model=ANALYSIS_MODEL,
+        temperature=ANALYSIS_TEMPERATURE,
+        developer_prompt=build_ai_resume_skills_prompt(),
+        user_prompt="Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        schema_name="resume_skills_generation",
+        schema=ai_skills_schema(),
+        max_output_tokens=with_output_headroom(2600, MEDIUM_OUTPUT_HEADROOM),
+        request_timeout_seconds=OPENAI_ANALYSIS_TIMEOUT_SECONDS,
+        reasoning_effort="low",
+    )
+
+
+def review_core_sections(
+    *,
+    api_key: str,
+    analysis_payload: dict,
+    title_summary_payload: dict,
+    skills_payload: dict,
+) -> dict:
+    compact_analysis = compact_analysis_for_generation(analysis_payload)
+    current_core = merge_core_sections(title_summary_payload, skills_payload)
+    user_parts = [
+        "Analysis:",
+        json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        "Current title and summary:",
+        json.dumps(
+            {
+                "updated_title": current_core.get("updated_title", ""),
+                "updated_summary": current_core.get("updated_summary", ""),
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        "Current skills:",
+        json.dumps({"updated_skills": current_core.get("updated_skills", [])}, ensure_ascii=False, separators=(",", ":")),
+    ]
+    return call_openai_structured_output(
+        api_key=api_key,
+        model=ANALYSIS_MODEL,
+        temperature=ANALYSIS_TEMPERATURE,
+        developer_prompt=build_ai_core_review_prompt(),
+        user_prompt="\n\n".join(user_parts),
+        schema_name="resume_core_review",
+        schema=ai_core_review_schema(),
+        max_output_tokens=with_output_headroom(1200, SMALL_OUTPUT_HEADROOM),
+        request_timeout_seconds=OPENAI_ANALYSIS_TIMEOUT_SECONDS,
+        reasoning_effort="low",
+    )
+
+
+def refine_core_sections(
+    *,
+    api_key: str,
+    analysis_payload: dict,
+    title_summary_payload: dict,
+    skills_payload: dict,
+) -> dict:
+    compact_analysis = compact_analysis_for_generation(analysis_payload)
+    current_core = merge_core_sections(title_summary_payload, skills_payload)
+    user_parts = [
+        "Analysis:",
+        json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        "Candidate experience framing: 4+ years. If the summary mentions years of experience at all, use 4+ years and never anything higher.",
+        "Current core:",
+        json.dumps(current_core, ensure_ascii=False, separators=(",", ":")),
+    ]
+    return call_openai_structured_output(
+        api_key=api_key,
+        model=RESUME_MODEL,
+        temperature=RESUME_TEMPERATURE,
+        developer_prompt=build_ai_core_correction_prompt(),
+        user_prompt="\n\n".join(user_parts),
+        schema_name="resume_core_correction",
+        schema=ai_core_correction_schema(),
+        max_output_tokens=with_output_headroom(2600, MEDIUM_OUTPUT_HEADROOM),
         request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
         reasoning_effort="low",
     )
@@ -1529,8 +2125,43 @@ def generate_resume_experience_from_analysis(
         user_prompt="\n\n".join(user_parts),
         schema_name="resume_experience_generation",
         schema=ai_experience_schema(),
-        max_output_tokens=5600,
+        max_output_tokens=with_output_headroom(5600, LARGE_OUTPUT_HEADROOM),
         request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
+        reasoning_effort="low",
+    )
+
+
+def generate_experience_subset_from_analysis(
+    *,
+    api_key: str,
+    analysis_payload: dict,
+    core_payload: dict,
+    blueprints: list[dict],
+    model: str,
+    timeout_seconds: int,
+) -> dict:
+    compact_analysis = compact_analysis_for_generation(analysis_payload)
+    compact_core = {
+        "updated_title": str(core_payload.get("updated_title", "")).strip(),
+        "updated_summary": str(core_payload.get("updated_summary", "")).strip(),
+        "updated_skills": core_payload.get("updated_skills", []),
+    }
+    user_parts = [
+        "Analysis:",
+        json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        "Selected resume core:",
+        json.dumps(compact_core, ensure_ascii=False, separators=(",", ":")),
+    ]
+    return call_openai_structured_output(
+        api_key=api_key,
+        model=model,
+        temperature=RESUME_TEMPERATURE,
+        developer_prompt=build_ai_resume_experience_subset_prompt(blueprints),
+        user_prompt="\n\n".join(user_parts),
+        schema_name="resume_experience_subset_generation",
+        schema=ai_experience_subset_schema(blueprints),
+        max_output_tokens=with_output_headroom(5200 if len(blueprints) > 1 else 2800, LARGE_OUTPUT_HEADROOM if len(blueprints) > 1 else MEDIUM_OUTPUT_HEADROOM),
+        request_timeout_seconds=timeout_seconds,
         reasoning_effort="low",
     )
 
@@ -1544,36 +2175,50 @@ def generate_reachout_message(
 ) -> dict:
     compact_analysis = compact_analysis_for_reachout(analysis_payload)
     resume_snapshot = extract_reachout_resume_snapshot(current_resume_content)
+    target_company = ""
+    company_match = re.search(r"^\s*([A-Z][A-Za-z0-9&.,' -]{1,80})\s+is\s+", job_description.strip())
+    if company_match:
+        target_company = company_match.group(1).strip()
+
     user_parts = [
-        f"Job description:\n{job_description.strip()}",
         "Write one LinkedIn reachout message for a recruiter or hiring manager.",
-        "Keep it under 300 characters.",
-        "Use this style target exactly: short opener, compact candidate snapshot across a few short lines, direct ask, thanks.",
-        "Example shape: 'Hey <name>, keeping this short:' then 2-3 short lines of background, then 'I am highly interested in <company/role>. What can I do to get an interview? Thanks for your time!'",
-        "JD analysis:",
-        json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        "Keep it under 300 characters total.",
+        "Match this shape exactly:",
+        "Hey <name>, keeping this short:",
+        "I'm a full-stack engineer working across React, Node.js, Python, and Postgres.",
+        "I'm especially interested in this role because it fits customer-driven product work and AI workflow delivery.",
+        "What can I do to get an interview? Thanks for your time!",
+        f"Target company: {target_company or 'unknown'}",
+        f"Target role: {compact_analysis.get('target_role', '')}",
+        f"Core problem: {compact_analysis.get('core_problem', '')}",
+        "Core skills: " + ", ".join(compact_analysis.get("core_skills", [])[:3]),
     ]
-    if resume_snapshot["title"] or resume_snapshot["summary"]:
+    if compact_analysis.get("behavioral_signals"):
+        user_parts.append("Behavioral signals: " + ", ".join(compact_analysis["behavioral_signals"][:2]))
+    if resume_snapshot["title"]:
+        user_parts.append(f"Resume title: {resume_snapshot['title']}")
+    if resume_snapshot["summary"]:
         user_parts.append(
-            "Resume snapshot:\n" +
-            json.dumps(resume_snapshot, ensure_ascii=False, separators=(",", ":"))
+            f"Resume summary: {resume_snapshot['summary']}"
         )
 
-    parsed_payload = call_openai_structured_output(
+    message = call_openai_text_output(
         api_key=api_key,
         model=ANALYSIS_MODEL,
         temperature=RESUME_TEMPERATURE,
         developer_prompt=build_ai_reachout_prompt(),
         user_prompt="\n\n".join(user_parts),
-        schema_name="reachout_generation",
-        schema=ai_reachout_schema(),
-        max_output_tokens=320,
+        max_output_tokens=with_output_headroom(500, SMALL_OUTPUT_HEADROOM),
         request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
         reasoning_effort="low",
     )
-    parsed_payload["message"] = str(parsed_payload.get("message", "")).strip()
-    parsed_payload["char_count"] = len(parsed_payload["message"])
-    return parsed_payload
+    message = str(message).strip().replace("\r\n", "\n").replace("\r", "\n")
+    message = "\n".join(line.strip() for line in message.split("\n") if line.strip())
+    if len(message) > 300:
+        message = message[:300].rstrip()
+        if " " in message:
+            message = message.rsplit(" ", 1)[0].rstrip(" ,.;")
+    return {"message": message, "char_count": len(message)}
 
 
 def call_openai_resume_engine(
@@ -2220,6 +2865,167 @@ def generate_ai_core():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/ai/generate-title-summary", methods=["POST"])
+def generate_ai_title_summary():
+    try:
+        data = request.get_json() or {}
+        session_id = str(data.get("session_id", "")).strip() or None
+        if not session_id or session_id not in ai_sessions:
+            return jsonify({"success": False, "error": "An active JD session is required."}), 400
+
+        session = ai_sessions[session_id]
+        analysis_payload = session.get("analysis")
+        if not analysis_payload:
+            raise AIStageError("analysis", "JD analysis is required before title and summary generation.")
+
+        started = time.perf_counter()
+        title_summary = generate_title_summary_from_analysis(
+            api_key=os.getenv("OPENAI_API_KEY", "").strip(),
+            analysis_payload=analysis_payload,
+        )
+        timing = {"title_summary_ms": int((time.perf_counter() - started) * 1000)}
+        timing["total_ms"] = timing["title_summary_ms"]
+
+        issues = validate_title_summary_payload(title_summary)
+        if issues:
+            raise AIStageError("title_summary_generation", "Title and summary generation failed validation: " + " | ".join(issues[:3]), analysis=analysis_payload, timing=timing)
+
+        session["title_summary"] = title_summary
+        session["experience_recent"] = None
+        session["experience_older"] = None
+        if session.get("skills"):
+            session["core_resume"] = merge_core_sections(title_summary, session["skills"])
+        session["updated_at"] = time.time()
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "title_summary": title_summary,
+            "content": format_title_summary_text(title_summary),
+            "timing": timing,
+        })
+    except AIStageError as e:
+        return jsonify({"success": False, "error": str(e), "stage": e.stage, "analysis": e.analysis, "timing": e.timing}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/ai/generate-skills", methods=["POST"])
+def generate_ai_skills():
+    try:
+        data = request.get_json() or {}
+        session_id = str(data.get("session_id", "")).strip() or None
+        if not session_id or session_id not in ai_sessions:
+            return jsonify({"success": False, "error": "An active JD session is required."}), 400
+
+        session = ai_sessions[session_id]
+        analysis_payload = session.get("analysis")
+        if not analysis_payload:
+            raise AIStageError("analysis", "JD analysis is required before skills generation.")
+
+        started = time.perf_counter()
+        skills_payload = generate_skills_from_analysis(
+            api_key=os.getenv("OPENAI_API_KEY", "").strip(),
+            analysis_payload=analysis_payload,
+        )
+        timing = {"skills_ms": int((time.perf_counter() - started) * 1000)}
+        timing["total_ms"] = timing["skills_ms"]
+
+        skills_payload["updated_skills"] = normalize_updated_skills(skills_payload.get("updated_skills", []))
+        issues = validate_skills_only_payload(skills_payload, analysis_payload)
+        if issues:
+            raise AIStageError("skills_generation", "Skills generation failed validation: " + " | ".join(issues[:3]), analysis=analysis_payload, timing=timing)
+
+        session["skills"] = skills_payload
+        session["experience_recent"] = None
+        session["experience_older"] = None
+        if session.get("title_summary"):
+            session["core_resume"] = merge_core_sections(session["title_summary"], skills_payload)
+        session["updated_at"] = time.time()
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "skills": skills_payload,
+            "content": format_skills_text(skills_payload),
+            "timing": timing,
+        })
+    except AIStageError as e:
+        return jsonify({"success": False, "error": str(e), "stage": e.stage, "analysis": e.analysis, "timing": e.timing}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/ai/review-core", methods=["POST"])
+def review_ai_core():
+    try:
+        data = request.get_json() or {}
+        session_id = str(data.get("session_id", "")).strip() or None
+        if not session_id or session_id not in ai_sessions:
+            return jsonify({"success": False, "error": "An active JD session is required."}), 400
+
+        session = ai_sessions[session_id]
+        analysis_payload = session.get("analysis")
+        title_summary = session.get("title_summary")
+        skills_payload = session.get("skills")
+        if not analysis_payload:
+            raise AIStageError("analysis", "JD analysis is required before core review.")
+        if not title_summary or not skills_payload:
+            raise AIStageError("core_generation", "Title, summary, and skills are required before core review.", analysis=analysis_payload)
+
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        started = time.perf_counter()
+        corrected_payload = refine_core_sections(
+            api_key=api_key,
+            analysis_payload=analysis_payload,
+            title_summary_payload=title_summary,
+            skills_payload=skills_payload,
+        )
+        timing = {"core_refinement_ms": int((time.perf_counter() - started) * 1000)}
+
+        corrected_title_summary = {
+            "updated_title": str(title_summary.get("updated_title", "")).strip(),
+            "updated_summary": str(corrected_payload.get("updated_summary", "")).strip(),
+        }
+        corrected_skills = {
+            "updated_skills": normalize_updated_skills(corrected_payload.get("updated_skills", []))
+        }
+
+        summary_issues = validate_title_summary_payload(corrected_title_summary, summary_max_buffer=10)
+        skills_issues = validate_skills_only_payload(corrected_skills, analysis_payload)
+        issues = summary_issues + skills_issues
+        if issues:
+            corrected_title_summary = title_summary
+            corrected_skills = skills_payload
+            revised = False
+        else:
+            revised = (
+                corrected_title_summary.get("updated_summary", "").strip() != str(title_summary.get("updated_summary", "")).strip()
+                or normalize_updated_skills(corrected_skills.get("updated_skills", []))
+                != normalize_updated_skills(skills_payload.get("updated_skills", []))
+            )
+
+        session["title_summary"] = corrected_title_summary
+        session["skills"] = corrected_skills
+
+        session["experience_recent"] = None
+        session["experience_older"] = None
+        session["core_resume"] = merge_core_sections(session["title_summary"], session["skills"])
+        session["updated_at"] = time.time()
+        timing["total_ms"] = timing["core_refinement_ms"]
+
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "revised": revised,
+            "core": session["core_resume"],
+            "content": format_core_resume_text(session["core_resume"]),
+            "timing": timing,
+        })
+    except AIStageError as e:
+        return jsonify({"success": False, "error": str(e), "stage": e.stage, "analysis": e.analysis, "timing": e.timing}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/api/ai/generate-experience", methods=["POST"])
 def generate_ai_experience():
     try:
@@ -2296,6 +3102,100 @@ def generate_ai_experience():
         }
         if 'session' in locals() and session.get("core_resume"):
             response["content"] = format_core_resume_text(session["core_resume"])
+        return jsonify(response), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/ai/generate-experience-recent", methods=["POST"])
+def generate_ai_experience_recent():
+    return _generate_ai_experience_subset(recent=True)
+
+
+@app.route("/api/ai/generate-experience-older", methods=["POST"])
+def generate_ai_experience_older():
+    return _generate_ai_experience_subset(recent=False)
+
+
+def _generate_ai_experience_subset(*, recent: bool):
+    try:
+        data = request.get_json() or {}
+        session_id = str(data.get("session_id", "")).strip() or None
+        if not session_id or session_id not in ai_sessions:
+            return jsonify({"success": False, "error": "An active JD session is required."}), 400
+
+        session = ai_sessions[session_id]
+        analysis_payload = session.get("analysis")
+        title_summary = session.get("title_summary")
+        skills_payload = session.get("skills")
+        if not analysis_payload:
+            raise AIStageError("analysis", "JD analysis is required before experience generation.")
+        if not title_summary or not skills_payload:
+            raise AIStageError("core_generation", "Title, summary, and skills are required before experience generation.", analysis=analysis_payload)
+
+        core_payload = merge_core_sections(title_summary, skills_payload)
+        blueprints = EXPERIENCE_BLUEPRINTS[:2] if recent else EXPERIENCE_BLUEPRINTS[2:]
+        model = RESUME_MODEL
+        timeout_seconds = OPENAI_RESUME_TIMEOUT_SECONDS
+
+        started = time.perf_counter()
+        subset_payload = generate_experience_subset_from_analysis(
+            api_key=os.getenv("OPENAI_API_KEY", "").strip(),
+            analysis_payload=analysis_payload,
+            core_payload=core_payload,
+            blueprints=blueprints,
+            model=model,
+            timeout_seconds=timeout_seconds,
+        )
+        timing_key = "recent_experience_ms" if recent else "older_experience_ms"
+        timing = {timing_key: int((time.perf_counter() - started) * 1000)}
+        timing["total_ms"] = timing[timing_key]
+
+        issues = validate_experience_subset_payload(subset_payload, blueprints)
+        if issues:
+            raise AIStageError(
+                "experience_generation",
+                "Experience generation failed validation: " + " | ".join(issues[:3]),
+                analysis=analysis_payload,
+                timing=timing,
+            )
+
+        subset_key = "experience_recent" if recent else "experience_older"
+        session[subset_key] = subset_payload
+        session["core_resume"] = core_payload
+        if session.get("experience_recent") and session.get("experience_older"):
+            merged_experience = {"experience": {}}
+            merged_experience["experience"].update(session["experience_recent"].get("experience", {}))
+            merged_experience["experience"].update(session["experience_older"].get("experience", {}))
+            merged_payload = merge_resume_payloads(core_payload, merged_experience)
+            resume_text = format_generated_resume_text(merged_payload)
+            turn = {
+                "revision_request": "",
+                "analysis": analysis_payload,
+                "resume_text": resume_text,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            session["turns"] = (session.get("turns", []) + [turn])[-AI_MEMORY_LIMIT:]
+            session["updated_at"] = time.time()
+            return jsonify({
+                "success": True,
+                "session_id": session_id,
+                "content": resume_text,
+                "experience": merged_experience,
+                "timing": timing,
+                "complete": True,
+            })
+
+        session["updated_at"] = time.time()
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "experience": subset_payload,
+            "timing": timing,
+            "complete": False,
+        })
+    except AIStageError as e:
+        response = {"success": False, "error": str(e), "stage": e.stage, "analysis": e.analysis, "timing": e.timing}
         return jsonify(response), 500
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
