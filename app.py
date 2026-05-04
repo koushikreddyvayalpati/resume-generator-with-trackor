@@ -136,6 +136,83 @@ ALLOWED_SKILL_CATEGORIES = {
     "Security & Auth",
 }
 
+SKILL_CATEGORY_ORDER_TEMPLATES = {
+    "fullstack_product": [
+        "Programming Languages",
+        "Frontend Engineering",
+        "Backend Engineering",
+        "Data & Storage",
+        "Cloud & Infrastructure",
+        "DevOps & CI/CD",
+        "Testing & Quality",
+        "AI & LLM Systems",
+        "System Design & Performance",
+    ],
+    "backend_application": [
+        "Programming Languages",
+        "Backend Engineering",
+        "Data & Storage",
+        "Cloud & Infrastructure",
+        "Observability & Reliability",
+        "DevOps & CI/CD",
+        "Testing & Quality",
+        "System Design & Performance",
+        "Security & Auth",
+    ],
+    "data_engineering": [
+        "Programming Languages",
+        "Data Engineering",
+        "Data & Storage",
+        "Frontend Engineering",
+        "Cloud & Infrastructure",
+        "DevOps & CI/CD",
+        "Testing & Quality",
+        "AI & LLM Systems",
+        "System Design & Performance",
+    ],
+    "platform_distributed": [
+        "Programming Languages",
+        "Backend Engineering",
+        "Messaging & Streaming",
+        "Cloud & Infrastructure",
+        "Observability & Reliability",
+        "DevOps & CI/CD",
+        "Testing & Quality",
+        "System Design & Performance",
+        "Security & Auth",
+    ],
+    "embedded_systems": [
+        "Programming Languages",
+        "Embedded Systems",
+        "Backend Engineering",
+        "Observability & Reliability",
+        "Testing & Quality",
+        "System Design & Performance",
+        "Security & Auth",
+    ],
+    "ai_application": [
+        "Programming Languages",
+        "AI & LLM Systems",
+        "Frontend Engineering",
+        "Backend Engineering",
+        "Data & Storage",
+        "Cloud & Infrastructure",
+        "DevOps & CI/CD",
+        "Testing & Quality",
+        "System Design & Performance",
+    ],
+    "solutions_engineering": [
+        "Programming Languages",
+        "Backend Engineering",
+        "Frontend Engineering",
+        "Data & Storage",
+        "Cloud & Infrastructure",
+        "Testing & Quality",
+        "System Design & Performance",
+        "AI & LLM Systems",
+    ],
+}
+
 PREFERRED_SKILL_CATEGORY_ORDER = [
     "Programming Languages",
     "Backend Engineering",
@@ -153,6 +230,91 @@ PREFERRED_SKILL_CATEGORY_ORDER = [
     "Mobile Development",
     "Embedded Systems",
 ]
+
+ROLE_FAMILY_TO_SKILL_ORDER_KEY = {
+    "full-stack product engineering": "fullstack_product",
+    "backend application engineering": "backend_application",
+    "data engineering": "data_engineering",
+    "analytics engineering": "data_engineering",
+    "platform engineering": "platform_distributed",
+    "distributed systems engineering": "platform_distributed",
+    "cloud infrastructure engineering": "platform_distributed",
+    "embedded systems engineering": "embedded_systems",
+    "system software engineering": "embedded_systems",
+    "ai application engineering": "ai_application",
+    "solutions engineering": "solutions_engineering",
+    "implementation engineering": "solutions_engineering",
+}
+
+SKILL_GENERIC_PHRASES = {
+    "monitoring tools",
+    "data driven solutions",
+    "ai feature integration",
+    "deployment strategies",
+    "technical design discussions",
+    "reliability focused design",
+    "service design and apis",
+    "service design & apis",
+    "product focused ui and interaction design",
+    "cost aware cloud architecture",
+}
+
+SKILL_CATEGORY_PATTERNS = {
+    "Programming Languages": (
+        "python", "java", "javascript", "typescript", "sql", "pl-sql", "oracle sql", "c#", "c++", "go", "rust", "scala",
+    ),
+    "Frontend Engineering": (
+        "react", "reactjs", "next.js", "nextjs", "ui", "dashboard", "visualization", "component", "responsive", "accessibility",
+        "state management", "api integration", "rich-text", "rich text", "css", "webpack", "storybook",
+    ),
+    "Backend Engineering": (
+        "node", "node.js", "graphql", "rest api", "webhook", "service architecture", "api design", "grpc", "protobuf",
+        "microservice", "tokio", "flask", "fastapi", "spring", "asp.net", "entity framework",
+    ),
+    "Data & Storage": (
+        "snowflake", "oracle", "oracle sql", "oracle pl-sql", "postgres", "postgresql", "mysql", "sql server", "redis",
+        "mongodb", "schema", "partition", "query", "warehouse", "data modeling", "index", "materialized view",
+    ),
+    "Cloud & Infrastructure": (
+        "aws", "gcp", "azure", "google cloud", "docker", "kubernetes", "terraform", "terragrunt", "pulumi", "helm",
+        "cloudformation", "cdk", "lambda", "cloud run", "gke", "eks", "ecs", "serverless",
+    ),
+    "DevOps & CI/CD": (
+        "github actions", "gitlab", "jenkins", "argocd", "codepipeline", "ci/cd", "ci cd", "deployment", "release",
+        "build", "smoke test", "rollout",
+    ),
+    "Observability & Reliability": (
+        "prometheus", "grafana", "cloudwatch", "datadog", "opentelemetry", "logging", "monitoring", "alerting", "tracing",
+        "telemetry", "observability", "incident", "mttr", "slo", "sli",
+    ),
+    "Testing & Quality": (
+        "unit testing", "integration testing", "end-to-end", "e2e", "cypress", "jest", "validation", "test automation",
+        "data quality", "debugging", "root-cause", "root cause", "regression",
+    ),
+    "System Design & Performance": (
+        "performance", "throughput", "latency", "scalable", "reliable", "fault tolerance", "concurrency", "architecture",
+        "cost optimization", "pipeline architecture", "distributed systems", "real-time", "deterministic",
+    ),
+    "AI & LLM Systems": (
+        "claude", "anthropic", "openai", "llm", "rag", "prompt", "agent", "agentic", "embedding", "vector", "semantic",
+        "model integration", "inference",
+    ),
+    "Data Engineering": (
+        "pyspark", "spark", "etl", "elt", "airflow", "orchestration", "data pipeline", "data ingestion", "batch", "stream",
+        "workflow orchestration", "copy load",
+    ),
+    "Messaging & Streaming": (
+        "kafka", "pubsub", "streaming", "websocket", "tcp", "udp", "messaging", "event", "queue",
+    ),
+    "Security & Auth": (
+        "auth", "authentication", "authorization", "jwt", "oauth", "security", "secret management", "owasp", "encryption",
+        "dod", "secure communications",
+    ),
+    "Embedded Systems": (
+        "embedded", "embedded linux", "nixos", "sensor fusion", "can", "rs-232", "firmware", "serial", "control system",
+        "real-time", "hardware", "actuator", "ros2",
+    ),
+}
 
 SYSTEM_SIGNAL_TERMS = {
     "api", "database", "db", "pipeline", "service", "workflow", "queue", "cache",
@@ -308,8 +470,8 @@ def compact_turn_for_prompt(turn: dict) -> str:
         lines.append(f"Core problem identified: {analysis['core_problem']}")
     if analysis.get("target_role"):
         lines.append(f"Target role: {analysis['target_role']}")
-    if analysis.get("core_skills"):
-        lines.append("Core skills: " + ", ".join(analysis["core_skills"][:8]))
+    if analysis.get("skills_mentioned"):
+        lines.append("Skills mentioned: " + ", ".join(analysis["skills_mentioned"][:8]))
     if resume_text:
         lines.append("Resume draft used previously:")
         lines.append(resume_text)
@@ -332,23 +494,16 @@ def compact_analysis_for_generation(analysis_payload: dict) -> dict:
         "culture_signals": compact_list(analysis_payload.get("culture_signals", []), 4),
         "target_role": str(analysis_payload.get("target_role", "")).strip(),
         "role_family": str(analysis_payload.get("role_family", "")).strip(),
+        "skill_category_order_key": str(analysis_payload.get("skill_category_order_key", "")).strip(),
         "core_problem": str(analysis_payload.get("core_problem", "")).strip(),
         "hire_problem": str(analysis_payload.get("hire_problem", "")).strip(),
         "desired_outcomes": compact_list(analysis_payload.get("desired_outcomes", []), 4),
         "system_description": str(analysis_payload.get("system_description", "")).strip(),
         "responsibilities": compact_list(analysis_payload.get("responsibilities", []), 5),
         "workflows": compact_list(analysis_payload.get("workflows", []), 5),
-        "core_skills": compact_list(analysis_payload.get("core_skills", []), 8),
-        "supporting_skills": compact_list(analysis_payload.get("supporting_skills", []), 10),
-        "primary_stack_signals": compact_list(analysis_payload.get("primary_stack_signals", []), 6),
-        "supporting_stack_signals": compact_list(analysis_payload.get("supporting_stack_signals", []), 6),
-        "must_have_skills": compact_list(analysis_payload.get("must_have_skills", []), 6),
-        "nice_to_have_skills": compact_list(analysis_payload.get("nice_to_have_skills", []), 5),
-        "skills_emphasis": compact_list(analysis_payload.get("skills_emphasis", []), 5),
-        "skills_cautions": compact_list(analysis_payload.get("skills_cautions", []), 5),
+        "skills_mentioned": compact_list(analysis_payload.get("skills_mentioned", []), 20),
         "behavioral_signals": compact_list(analysis_payload.get("behavioral_signals", []), 5),
         "gaps": compact_list(analysis_payload.get("gaps", []), 5),
-        "build_strategy": compact_list(analysis_payload.get("build_strategy", []), 6),
     }
 
 
@@ -358,7 +513,7 @@ def compact_analysis_for_reachout(analysis_payload: dict) -> dict:
         "company_name": compact.get("company_name", ""),
         "target_role": compact.get("target_role", ""),
         "core_problem": compact.get("core_problem", ""),
-        "core_skills": compact.get("core_skills", [])[:4],
+        "skills_mentioned": compact.get("skills_mentioned", [])[:4],
         "behavioral_signals": compact.get("behavioral_signals", [])[:3],
     }
 
@@ -441,6 +596,7 @@ def normalize_updated_skills(skills_payload: list[dict]) -> list[dict]:
         return []
 
     category_buckets: dict[str, list[str]] = {}
+    encountered_categories: list[str] = []
     global_seen: set[str] = set()
 
     for entry in skills_payload:
@@ -448,7 +604,10 @@ def normalize_updated_skills(skills_payload: list[dict]) -> list[dict]:
         if category not in ALLOWED_SKILL_CATEGORIES:
             continue
 
-        bucket = category_buckets.setdefault(category, [])
+        if category not in category_buckets:
+            category_buckets[category] = []
+            encountered_categories.append(category)
+        bucket = category_buckets[category]
         local_seen: set[str] = {normalize_skill_dedupe_key(item) for item in bucket}
 
         for item in expand_skill_items(entry.get("items", [])):
@@ -463,23 +622,57 @@ def normalize_updated_skills(skills_payload: list[dict]) -> list[dict]:
             local_seen.add(key)
             global_seen.add(key)
 
-    ordered_categories = [
-        category for category in PREFERRED_SKILL_CATEGORY_ORDER
-        if category in category_buckets and len(category_buckets[category]) >= 2
-    ]
-    remaining_categories = sorted(
-        category for category in category_buckets
-        if category not in ordered_categories and len(category_buckets[category]) >= 2
-    )
-
     normalized: list[dict] = []
-    for category in [*ordered_categories, *remaining_categories]:
+    for category in encountered_categories:
+        if len(category_buckets[category]) < 2:
+            continue
         normalized.append({
             "category": category,
             "items": category_buckets[category],
         })
 
     return normalized
+
+
+def infer_skill_category_order_key(role_family: str) -> str:
+    family = (role_family or "").strip().lower()
+    for known_family, key in ROLE_FAMILY_TO_SKILL_ORDER_KEY.items():
+        if known_family in family:
+            return key
+    if "data" in family or "analytics" in family:
+        return "data_engineering"
+    if "platform" in family or "distributed" in family or "infrastructure" in family:
+        return "platform_distributed"
+    if "embedded" in family or "system software" in family:
+        return "embedded_systems"
+    if "solution" in family or "implementation" in family:
+        return "solutions_engineering"
+    if "ai" in family:
+        return "ai_application"
+    if "backend" in family:
+        return "backend_application"
+    return "fullstack_product"
+
+
+def skill_category_order_for_key(order_key: str) -> list[str]:
+    return list(SKILL_CATEGORY_ORDER_TEMPLATES.get(order_key, SKILL_CATEGORY_ORDER_TEMPLATES["fullstack_product"]))
+
+
+def normalize_skills_for_order(skills_payload: dict, ordered_categories: list[str]) -> dict:
+    normalized = normalize_updated_skills(skills_payload.get("updated_skills", []))
+    allowed_categories = set(ordered_categories)
+    by_category = {
+        str(entry.get("category", "")).strip(): entry.get("items", [])
+        for entry in normalized
+        if str(entry.get("category", "")).strip() in allowed_categories
+    }
+    return {
+        "updated_skills": [
+            {"category": category, "items": by_category[category]}
+            for category in ordered_categories
+            if category in by_category and len(expand_skill_items(by_category[category])) >= 2
+        ]
+    }
 
 
 def build_ai_analysis_prompt() -> str:
@@ -489,8 +682,14 @@ def build_ai_analysis_prompt() -> str:
             "Assume the candidate has 4+ years of experience.",
             "Analyze the JD and return a compact role model for downstream resume generation.",
             "Do not mirror the JD or invent unsupported domain expertise.",
-            "Infer the company context, role family, problem, system, stack signals, must-have skills, nice-to-have signals, behavior, and resume emphasis.",
-            "Treat must-have and nice-to-have as signals, not final resume text.",
+            "Infer the company context, role family, problem, system, skills and technologies mentioned, and behavioral signals.",
+            "Role family must describe the actual engineering shape of the job, not a generic software-engineer label.",
+            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, solutions engineering, implementation engineering, or AI application engineering.",
+            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, platform_distributed, embedded_systems, ai_application, solutions_engineering.",
+            "Pick the skill_category_order_key that best fits the role family and technical center of the JD.",
+            "If the JD centers on SQL, PySpark, Snowflake, ETL, orchestration, dashboards, or data quality, classify it as data engineering or analytics engineering rather than generic software engineering.",
+            "If the JD centers on Rust, Linux, concurrency, networking, security platforms, or low-level services, classify it as platform engineering or distributed systems engineering rather than generic full-stack work.",
+            "Return one unified skills_mentioned list containing all important skills, tools, frameworks, platforms, and technologies explicitly mentioned anywhere in the JD, including required, preferred, and nice-to-have items.",
             "Return only structured analysis matching the schema.",
         ]
     )
@@ -635,9 +834,8 @@ def build_ai_resume_prompt() -> str:
             "- Do not introduce named infrastructure products, platforms, or observability tools unless they materially improve clarity and feel realistically grounded in the candidate's work",
             "",
             "SKILL DERIVATION RULE:",
-            "- Use both analysis.core_skills and analysis.supporting_skills deliberately",
-            "- Core skills should reflect what the JD explicitly needs to solve the main problem",
-            "- Supporting skills should reflect what is required to build, run, scale, monitor, secure, validate, and debug that system in production",
+            "- Use analysis.skills_mentioned deliberately",
+            "- Skills should reflect what the JD explicitly needs to solve the main problem and run the surrounding system in production",
             "- Ask: what is required to build, run, scale, and debug this system?",
             "- Do not stop at JD-facing skills alone",
             "- Make the skills ATS-friendly by including the important language from the JD naturally, but only when it fits the problem and system",
@@ -798,10 +996,13 @@ def build_ai_resume_title_summary_prompt() -> str:
             "- align to the company's domain without overclaiming direct domain expertise",
             "- do not echo company marketing language, product slogans, or copied business phrasing from the JD",
             "- prefer transferable product and workflow framing over company-specific wording when the domain match is only adjacent",
-            "- adapt by role family and culture signals",
+            "- adapt by role family, culture signals, and the skills, responsibilities, and workflows mentioned in the analysis object",
+            "- surface the strongest JD-mentioned technologies and workflows naturally in the summary when they fit the candidate-shaped story",
             "- platform roles: emphasize systems, reliability, APIs, scale",
             "- backend delivery roles: emphasize ownership, execution, architecture",
             "- customer-facing solutions roles: emphasize integrations, troubleshooting, technical communication",
+            "- data engineering or analytics engineering roles: emphasize SQL, pipelines, warehousing, orchestration, data quality, and how frontend work supports data users rather than treating the role like generic software engineering",
+            "- AI application roles: emphasize workflow automation, LLM integration, product iteration, and grounded delivery rather than generic platform language",
             "",
             "Return only the final result matching the schema.",
         ]
@@ -815,32 +1016,25 @@ def build_ai_resume_skills_prompt() -> str:
             "Build only Updated Skills.",
             "Assume the candidate has 4+ years of experience.",
             "Use the analysis object as the source of truth.",
-            "Convert role signals into a believable candidate-shaped skills section.",
-            "Do not copy JD skill lists directly. Use them as signals.",
-            "Use primary stack signals strongly, supporting stack signals second, must-have skills strongly, and nice-to-have skills lightly.",
+            "You will receive an exact ordered list of allowed skill categories.",
+            "Fill only those categories and keep them in the same order.",
+            "Use the role family, responsibilities, workflows, and unified skills_mentioned list from the analysis object.",
+            "Treat all important JD-mentioned skills and technologies as valid signals for the final section.",
             "",
             "SKILLS:",
-            "- use only allowed categories",
-            "- exactly one category per line",
-            "- each item must be one short skill or capability",
-            "- no slashes, brackets, or qualifier text",
-            "- keep the primary stack visible",
-            "- include supporting technologies and broader engineering capabilities",
-            "- consider nice-to-have signals lightly; do not force them",
-            "- prefer concrete technologies when the JD is explicit",
-            "- do not use vague filler phrases like 'data-driven solutions' or 'AI feature integration' when a concrete tool or capability is more accurate",
-            "- if a production language or framework is clearly central to the role signals, prefer naming it directly instead of replacing it with an abstract capability",
-            "- if a tool appears only as a nice-to-have signal, include it only when it still feels believable and proportionate",
-            "- prefer concrete categories such as Data & Storage, System Design & Performance, and Testing & Quality over generic mixed buckets",
-            "- put databases, storage engines, indexing, and query tuning under Data & Storage",
-            "- put RAG, prompt engineering, vector databases, and LLM integration under AI & LLM Systems when supported by the role signals",
-            "- if AI experience is only a supporting signal, keep the AI category modest and concrete instead of making it dominate the section",
+            "- use only the provided categories",
+            "- do not invent new categories",
+            "- each item must be one short skill name or capability name",
+            "- no explanations, no qualifier text, no mini-sentences",
+            "- prefer concrete technologies and concise capability names",
+            "- keep JD-mentioned languages, frameworks, platforms, and tools visible when they fit the category",
+            "- do not use vague filler like 'data-driven solutions', 'deployment strategies', or 'technical discussions'",
             "- do not repeat the same concept across categories",
-            "- expected pattern:",
-            "  - Programming Languages: JavaScript, TypeScript, Python",
-            "  - Backend Engineering: Node.js, REST API design, Service architecture",
-            "  - Data & Storage: MySQL, Schema design, Query optimization",
-            "  - Testing & Quality: Cypress, Integration testing, Debugging",
+            "- skip a category only if it is truly irrelevant; otherwise fill it with 2-5 strong items",
+            "- expected style:",
+            "  - Programming Languages: TypeScript, JavaScript, Python",
+            "  - Backend Engineering: Node.js, GraphQL, REST API design",
+            "  - Data & Storage: MongoDB, BigQuery, SQL",
             "",
             "Return only the final result matching the schema.",
         ]
@@ -1013,7 +1207,12 @@ def build_ai_core_correction_prompt() -> str:
             "Use the analysis object and current draft as the source of truth.",
             "Keep the title unchanged outside the schema; only return Updated Summary and Updated Skills.",
             "Inspect the current summary and skills, improve them only if needed, and otherwise keep them close to the draft.",
+            "Follow the role family and the JD facts from the analysis object.",
+            "Use the skills_mentioned list, responsibilities, and workflows to keep the strongest role match visible.",
+            "Use only the provided skill categories and keep them in the provided order.",
             "Focus on sharper role emphasis, cleaner summary phrasing, and more concrete, believable skills.",
+            "Do not let the refinement smooth a data, platform, AI application, or solutions role back into generic software-engineering language.",
+            "Do not replace strong concrete stack or workflow terms with broader wording just because it sounds cleaner.",
             "If the summary mentions years of experience at all, it must say 4+ years and never anything higher.",
             "Do not copy JD wording directly.",
             "Do not touch professional experience.",
@@ -1033,23 +1232,16 @@ def ai_analysis_schema() -> dict:
             "culture_signals": {"type": "array", "items": {"type": "string"}},
             "target_role": {"type": "string"},
             "role_family": {"type": "string"},
+            "skill_category_order_key": {"type": "string", "enum": sorted(SKILL_CATEGORY_ORDER_TEMPLATES.keys())},
             "core_problem": {"type": "string"},
             "hire_problem": {"type": "string"},
             "desired_outcomes": {"type": "array", "items": {"type": "string"}},
             "system_description": {"type": "string"},
             "responsibilities": {"type": "array", "items": {"type": "string"}},
             "workflows": {"type": "array", "items": {"type": "string"}},
-            "core_skills": {"type": "array", "items": {"type": "string"}},
-            "supporting_skills": {"type": "array", "items": {"type": "string"}},
-            "primary_stack_signals": {"type": "array", "items": {"type": "string"}},
-            "supporting_stack_signals": {"type": "array", "items": {"type": "string"}},
-            "must_have_skills": {"type": "array", "items": {"type": "string"}},
-            "nice_to_have_skills": {"type": "array", "items": {"type": "string"}},
-            "skills_emphasis": {"type": "array", "items": {"type": "string"}},
-            "skills_cautions": {"type": "array", "items": {"type": "string"}},
+            "skills_mentioned": {"type": "array", "items": {"type": "string"}},
             "behavioral_signals": {"type": "array", "items": {"type": "string"}},
             "gaps": {"type": "array", "items": {"type": "string"}},
-            "build_strategy": {"type": "array", "items": {"type": "string"}},
         },
         "required": [
             "company_name",
@@ -1058,23 +1250,16 @@ def ai_analysis_schema() -> dict:
             "culture_signals",
             "target_role",
             "role_family",
+            "skill_category_order_key",
             "core_problem",
             "hire_problem",
             "desired_outcomes",
             "system_description",
             "responsibilities",
             "workflows",
-            "core_skills",
-            "supporting_skills",
-            "primary_stack_signals",
-            "supporting_stack_signals",
-            "must_have_skills",
-            "nice_to_have_skills",
-            "skills_emphasis",
-            "skills_cautions",
+            "skills_mentioned",
             "behavioral_signals",
             "gaps",
-            "build_strategy",
         ],
     }
 
@@ -1188,8 +1373,8 @@ def ai_title_summary_schema() -> dict:
     }
 
 
-def ai_skills_schema() -> dict:
-    allowed_skill_categories = sorted(ALLOWED_SKILL_CATEGORIES)
+def ai_skills_schema(allowed_skill_categories: list[str] | None = None) -> dict:
+    allowed_skill_categories = allowed_skill_categories or sorted(ALLOWED_SKILL_CATEGORIES)
     skill_item_schema = {
         "type": "string",
         "minLength": 2,
@@ -1202,7 +1387,7 @@ def ai_skills_schema() -> dict:
         "properties": {
             "updated_skills": {
                 "type": "array",
-                "minItems": 6,
+                "minItems": min(6, len(allowed_skill_categories)),
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
@@ -1314,8 +1499,8 @@ def ai_core_review_schema() -> dict:
     }
 
 
-def ai_core_correction_schema() -> dict:
-    allowed_skill_categories = sorted(ALLOWED_SKILL_CATEGORIES)
+def ai_core_correction_schema(allowed_skill_categories: list[str] | None = None) -> dict:
+    allowed_skill_categories = allowed_skill_categories or sorted(ALLOWED_SKILL_CATEGORIES)
     skill_item_schema = {
         "type": "string",
         "minLength": 2,
@@ -1329,7 +1514,7 @@ def ai_core_correction_schema() -> dict:
             "updated_summary": {"type": "string"},
             "updated_skills": {
                 "type": "array",
-                "minItems": 6,
+                "minItems": min(6, len(allowed_skill_categories)),
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
@@ -1640,7 +1825,7 @@ def validate_model_payload(model_payload: dict) -> list[str]:
     experience = resume.get("experience") or {}
     jd_terms = {
         str(item).strip().lower()
-        for item in (analysis.get("core_skills") or [])
+        for item in (analysis.get("skills_mentioned") or [])
         if str(item).strip()
     }
 
@@ -1964,7 +2149,7 @@ def generate_resume_core_from_analysis(
     if memory_block:
         user_parts.append(f"Previous session memory (maximum two turns):\n{memory_block}")
 
-    return call_openai_structured_output(
+    raw_payload = call_openai_structured_output(
         api_key=api_key,
         model=RESUME_MODEL,
         temperature=RESUME_TEMPERATURE,
@@ -1976,6 +2161,15 @@ def generate_resume_core_from_analysis(
         request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
         reasoning_effort="low",
     )
+    order_key = str(analysis_payload.get("skill_category_order_key", "")).strip() or infer_skill_category_order_key(
+        analysis_payload.get("role_family", "")
+    )
+    ordered_categories = skill_category_order_for_key(order_key)
+    raw_payload["updated_skills"] = normalize_skills_for_order(
+        {"updated_skills": raw_payload.get("updated_skills", [])},
+        ordered_categories,
+    )["updated_skills"]
+    return raw_payload
 
 
 def generate_title_summary_from_analysis(
@@ -2004,18 +2198,30 @@ def generate_skills_from_analysis(
     analysis_payload: dict,
 ) -> dict:
     compact_analysis = compact_analysis_for_generation(analysis_payload)
-    return call_openai_structured_output(
+    order_key = str(analysis_payload.get("skill_category_order_key", "")).strip() or infer_skill_category_order_key(
+        analysis_payload.get("role_family", "")
+    )
+    ordered_categories = skill_category_order_for_key(order_key)
+    raw_payload = call_openai_structured_output(
         api_key=api_key,
         model=ANALYSIS_MODEL,
         temperature=ANALYSIS_TEMPERATURE,
         developer_prompt=build_ai_resume_skills_prompt(),
-        user_prompt="Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        user_prompt="\n\n".join(
+            [
+                "Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+                f"Skill category order key: {order_key}",
+                "Fill these categories in this exact order:",
+                json.dumps(ordered_categories, ensure_ascii=False),
+            ]
+        ),
         schema_name="resume_skills_generation",
-        schema=ai_skills_schema(),
+        schema=ai_skills_schema(ordered_categories),
         max_output_tokens=with_output_headroom(2600, MEDIUM_OUTPUT_HEADROOM),
         request_timeout_seconds=OPENAI_ANALYSIS_TIMEOUT_SECONDS,
         reasoning_effort="low",
     )
+    return normalize_skills_for_order(raw_payload, ordered_categories)
 
 
 def review_core_sections(
@@ -2065,9 +2271,17 @@ def refine_core_sections(
 ) -> dict:
     compact_analysis = compact_analysis_for_generation(analysis_payload)
     current_core = merge_core_sections(title_summary_payload, skills_payload)
+    order_key = str(analysis_payload.get("skill_category_order_key", "")).strip() or infer_skill_category_order_key(
+        analysis_payload.get("role_family", "")
+    )
+    ordered_categories = skill_category_order_for_key(order_key)
     user_parts = [
         "Analysis:",
         json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        "Use the role family and skills_mentioned list directly.",
+        f"Skill category order key: {order_key}",
+        "Fill these categories in this exact order:",
+        json.dumps(ordered_categories, ensure_ascii=False),
         "Candidate experience framing: 4+ years. If the summary mentions years of experience at all, use 4+ years and never anything higher.",
         "Current core:",
         json.dumps(current_core, ensure_ascii=False, separators=(",", ":")),
@@ -2079,7 +2293,7 @@ def refine_core_sections(
         developer_prompt=build_ai_core_correction_prompt(),
         user_prompt="\n\n".join(user_parts),
         schema_name="resume_core_correction",
-        schema=ai_core_correction_schema(),
+        schema=ai_core_correction_schema(ordered_categories),
         max_output_tokens=with_output_headroom(2600, MEDIUM_OUTPUT_HEADROOM),
         request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
         reasoning_effort="low",
@@ -2191,7 +2405,7 @@ def generate_reachout_message(
         f"Target company: {target_company or 'unknown'}",
         f"Target role: {compact_analysis.get('target_role', '')}",
         f"Core problem: {compact_analysis.get('core_problem', '')}",
-        "Core skills: " + ", ".join(compact_analysis.get("core_skills", [])[:3]),
+        "Skills mentioned: " + ", ".join(compact_analysis.get("skills_mentioned", [])[:3]),
     ]
     if compact_analysis.get("behavioral_signals"):
         user_parts.append("Behavioral signals: " + ", ".join(compact_analysis["behavioral_signals"][:2]))
@@ -2972,6 +3186,10 @@ def review_ai_core():
             raise AIStageError("core_generation", "Title, summary, and skills are required before core review.", analysis=analysis_payload)
 
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        order_key = str(analysis_payload.get("skill_category_order_key", "")).strip() or infer_skill_category_order_key(
+            analysis_payload.get("role_family", "")
+        )
+        ordered_categories = skill_category_order_for_key(order_key)
         started = time.perf_counter()
         corrected_payload = refine_core_sections(
             api_key=api_key,
@@ -2985,9 +3203,10 @@ def review_ai_core():
             "updated_title": str(title_summary.get("updated_title", "")).strip(),
             "updated_summary": str(corrected_payload.get("updated_summary", "")).strip(),
         }
-        corrected_skills = {
-            "updated_skills": normalize_updated_skills(corrected_payload.get("updated_skills", []))
-        }
+        corrected_skills = normalize_skills_for_order(
+            {"updated_skills": corrected_payload.get("updated_skills", [])},
+            ordered_categories,
+        )
 
         summary_issues = validate_title_summary_payload(corrected_title_summary, summary_max_buffer=10)
         skills_issues = validate_skills_only_payload(corrected_skills, analysis_payload)
@@ -3005,19 +3224,25 @@ def review_ai_core():
 
         session["title_summary"] = corrected_title_summary
         session["skills"] = corrected_skills
-
-        session["experience_recent"] = None
-        session["experience_older"] = None
         session["core_resume"] = merge_core_sections(session["title_summary"], session["skills"])
         session["updated_at"] = time.time()
         timing["total_ms"] = timing["core_refinement_ms"]
+
+        response_content = format_core_resume_text(session["core_resume"])
+        experience_payload = None
+        if session.get("experience_recent") and session.get("experience_older"):
+            experience_payload = {"experience": {}}
+            experience_payload["experience"].update(session["experience_recent"].get("experience", {}))
+            experience_payload["experience"].update(session["experience_older"].get("experience", {}))
+            response_content = format_generated_resume_text(merge_resume_payloads(session["core_resume"], experience_payload))
 
         return jsonify({
             "success": True,
             "session_id": session_id,
             "revised": revised,
             "core": session["core_resume"],
-            "content": format_core_resume_text(session["core_resume"]),
+            "experience": experience_payload,
+            "content": response_content,
             "timing": timing,
         })
     except AIStageError as e:

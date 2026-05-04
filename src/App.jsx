@@ -585,26 +585,12 @@ export default function App() {
       setAiSessionId(sessionAfterCore);
       setShowGeneratedArea(true);
       setGeneratedContent(coreContent);
-      const reviewedCoreData = await fetchJson("/api/ai/review-core", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionAfterCore }),
-      });
-
-      const sessionAfterReview = reviewedCoreData.session_id || sessionAfterCore;
-      const reviewedCoreContent = reviewedCoreData.content || coreContent;
-      setAiSessionId(sessionAfterReview);
-      setGeneratedContent(reviewedCoreContent);
       setAiThread((current) => [
         ...current,
         {
           kind: "assistant",
-          title: reviewedCoreData.revised ? "Core Draft Refined" : "Core Draft Ready",
-          lines: [
-            reviewedCoreData.revised
-              ? "Summary and technical skills were tightened before professional experience generation."
-              : "Summary and technical skills are ready. Professional experience is still generating.",
-          ],
+          title: "Core Draft Ready",
+          lines: ["Title, summary, and technical skills are ready. Professional experience is generating now."],
         },
       ]);
 
@@ -613,24 +599,47 @@ export default function App() {
         fetchJson("/api/ai/generate-experience-recent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionAfterReview }),
+          body: JSON.stringify({ session_id: sessionAfterCore }),
         }),
         fetchJson("/api/ai/generate-experience-older", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionAfterReview }),
+          body: JSON.stringify({ session_id: sessionAfterCore }),
         }),
       ]);
 
       const finalExperienceData = recentExperienceData.complete ? recentExperienceData : olderExperienceData;
-      setAiSessionId(finalExperienceData.session_id || sessionAfterReview || null);
-      setGeneratedContent(finalExperienceData.content || reviewedCoreContent);
+      const sessionAfterExperience = finalExperienceData.session_id || sessionAfterCore;
+      const fullResumeContent = finalExperienceData.content || coreContent;
+      setAiSessionId(sessionAfterExperience || null);
+      setGeneratedContent(fullResumeContent);
+      setShowGeneratedArea(true);
+
+      setAiStage("refinement");
+      const reviewedCoreData = await fetchJson("/api/ai/review-core", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionAfterExperience }),
+      });
+
+      const sessionAfterReview = reviewedCoreData.session_id || sessionAfterExperience;
+      const reviewedContent = reviewedCoreData.content || fullResumeContent;
+      setAiSessionId(sessionAfterReview || null);
+      setGeneratedContent(reviewedContent);
       setShowGeneratedArea(true);
       setComposerInput("");
       setTab("parsed");
       setAiThread((current) => [
         ...current,
-        { kind: "assistant", title: "Resume Complete", lines: ["Complete resume is generated. You can edit it directly in the parsed preview."] },
+        {
+          kind: "assistant",
+          title: reviewedCoreData.revised ? "Resume Refined" : "Resume Complete",
+          lines: [
+            reviewedCoreData.revised
+              ? "The full resume is ready, and the summary and technical skills were tightened after experience generation."
+              : "Complete resume is generated. You can edit it directly in the parsed preview.",
+          ],
+        },
       ]);
     } catch (error) {
       const payload = error.data || {};
@@ -650,7 +659,7 @@ export default function App() {
         analysis: "JD analysis failed",
         title_summary_generation: "Title and summary generation failed",
         skills_generation: "Skills generation failed",
-        core_review: "Summary and skills review failed",
+        core_review: "Resume refinement failed",
         core_generation: "Core resume generation failed",
         experience_generation: "Experience generation failed",
         resume_generation: "Resume generation failed",
