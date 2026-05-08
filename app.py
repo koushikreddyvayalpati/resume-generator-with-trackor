@@ -134,6 +134,18 @@ ALLOWED_SKILL_CATEGORIES = {
     "Embedded Systems",
     "Messaging & Streaming",
     "Security & Auth",
+    "Data Analysis & Querying",
+    "BI & Visualization",
+    "Reporting & Insights",
+    "Business Analysis",
+    "Process & Requirements",
+    "Marketing Analytics",
+    "Experimentation & Measurement",
+    "Stakeholder Communication",
+    "GTM Systems & Automation",
+    "CRM & RevOps Platforms",
+    "Outbound & Lifecycle Tooling",
+    "Tools & Platforms",
 }
 
 SKILL_CATEGORY_ORDER_TEMPLATES = {
@@ -211,6 +223,45 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "System Design & Performance",
         "AI & LLM Systems",
     ],
+    "analyst_data": [
+        "Programming Languages",
+        "Data Analysis & Querying",
+        "BI & Visualization",
+        "Data & Storage",
+        "Reporting & Insights",
+        "Experimentation & Measurement",
+        "Stakeholder Communication",
+        "Tools & Platforms",
+    ],
+    "analyst_business": [
+        "Business Analysis",
+        "Data Analysis & Querying",
+        "BI & Visualization",
+        "Process & Requirements",
+        "Reporting & Insights",
+        "Stakeholder Communication",
+        "Tools & Platforms",
+    ],
+    "analyst_marketing": [
+        "Marketing Analytics",
+        "Data Analysis & Querying",
+        "BI & Visualization",
+        "Experimentation & Measurement",
+        "Reporting & Insights",
+        "Stakeholder Communication",
+        "Tools & Platforms",
+    ],
+    "gtm_engineering": [
+        "Programming Languages",
+        "GTM Systems & Automation",
+        "CRM & RevOps Platforms",
+        "Data Analysis & Querying",
+        "Outbound & Lifecycle Tooling",
+        "Reporting & Insights",
+        "Stakeholder Communication",
+        "AI & LLM Systems",
+        "Tools & Platforms",
+    ],
 }
 
 PREFERRED_SKILL_CATEGORY_ORDER = [
@@ -229,6 +280,18 @@ PREFERRED_SKILL_CATEGORY_ORDER = [
     "Data Engineering",
     "Mobile Development",
     "Embedded Systems",
+    "Data Analysis & Querying",
+    "BI & Visualization",
+    "Reporting & Insights",
+    "Business Analysis",
+    "Process & Requirements",
+    "Marketing Analytics",
+    "Experimentation & Measurement",
+    "Stakeholder Communication",
+    "GTM Systems & Automation",
+    "CRM & RevOps Platforms",
+    "Outbound & Lifecycle Tooling",
+    "Tools & Platforms",
 ]
 
 ROLE_FAMILY_TO_SKILL_ORDER_KEY = {
@@ -244,6 +307,83 @@ ROLE_FAMILY_TO_SKILL_ORDER_KEY = {
     "ai application engineering": "ai_application",
     "solutions engineering": "solutions_engineering",
     "implementation engineering": "solutions_engineering",
+    "data analyst": "analyst_data",
+    "data analytics": "analyst_data",
+    "business analyst": "analyst_business",
+    "marketing analyst": "analyst_marketing",
+    "product analyst": "analyst_data",
+    "operations analyst": "analyst_business",
+    "financial analyst": "analyst_business",
+    "finance analyst": "analyst_business",
+    "supply chain analyst": "analyst_business",
+    "inventory analyst": "analyst_business",
+    "sales analyst": "analyst_marketing",
+    "pricing analyst": "analyst_business",
+    "cost analyst": "analyst_business",
+    "vendor management analyst": "analyst_business",
+    "reporting analyst": "analyst_data",
+    "research analyst": "analyst_data",
+    "institutional data analyst": "analyst_data",
+    "prospect analyst": "analyst_data",
+    "erp analyst": "analyst_business",
+    "business systems analyst": "analyst_business",
+    "systems analyst": "analyst_business",
+    "wms analyst": "analyst_business",
+    "warehouse management analyst": "analyst_business",
+    "gtm engineering": "gtm_engineering",
+    "go-to-market engineering": "gtm_engineering",
+    "go to market engineering": "gtm_engineering",
+    "gtm engineer": "gtm_engineering",
+    "go-to-market engineer": "gtm_engineering",
+    "go to market engineer": "gtm_engineering",
+    "revops engineering": "gtm_engineering",
+    "revenue engineering": "gtm_engineering",
+}
+
+ROLE_FAMILY_TO_PROMPT_FAMILY_KEY = {
+    "full-stack product engineering": "software_engineering",
+    "backend application engineering": "software_engineering",
+    "data engineering": "data_engineering",
+    "analytics engineering": "data_engineering",
+    "platform engineering": "platform_systems",
+    "distributed systems engineering": "platform_systems",
+    "cloud infrastructure engineering": "platform_systems",
+    "embedded systems engineering": "platform_systems",
+    "system software engineering": "platform_systems",
+    "ai application engineering": "software_engineering",
+    "solutions engineering": "solutions_customer",
+    "implementation engineering": "solutions_customer",
+    "data analyst": "analyst_data",
+    "data analytics": "analyst_data",
+    "business analyst": "analyst_business",
+    "marketing analyst": "analyst_marketing",
+    "product analyst": "analyst_data",
+    "operations analyst": "analyst_business",
+    "financial analyst": "analyst_business",
+    "finance analyst": "analyst_business",
+    "supply chain analyst": "analyst_business",
+    "inventory analyst": "analyst_business",
+    "sales analyst": "analyst_marketing",
+    "pricing analyst": "analyst_business",
+    "cost analyst": "analyst_business",
+    "vendor management analyst": "analyst_business",
+    "reporting analyst": "analyst_data",
+    "research analyst": "analyst_data",
+    "institutional data analyst": "analyst_data",
+    "prospect analyst": "analyst_data",
+    "erp analyst": "analyst_business",
+    "business systems analyst": "analyst_business",
+    "systems analyst": "analyst_business",
+    "wms analyst": "analyst_business",
+    "warehouse management analyst": "analyst_business",
+    "gtm engineering": "gtm_engineering",
+    "go-to-market engineering": "gtm_engineering",
+    "go to market engineering": "gtm_engineering",
+    "gtm engineer": "gtm_engineering",
+    "go-to-market engineer": "gtm_engineering",
+    "go to market engineer": "gtm_engineering",
+    "revops engineering": "gtm_engineering",
+    "revenue engineering": "gtm_engineering",
 }
 
 SKILL_GENERIC_PHRASES = {
@@ -495,6 +635,7 @@ def compact_analysis_for_generation(analysis_payload: dict) -> dict:
         "target_role": str(analysis_payload.get("target_role", "")).strip(),
         "role_family": str(analysis_payload.get("role_family", "")).strip(),
         "skill_category_order_key": str(analysis_payload.get("skill_category_order_key", "")).strip(),
+        "prompt_family_key": str(analysis_payload.get("prompt_family_key", "")).strip(),
         "core_problem": str(analysis_payload.get("core_problem", "")).strip(),
         "hire_problem": str(analysis_payload.get("hire_problem", "")).strip(),
         "desired_outcomes": compact_list(analysis_payload.get("desired_outcomes", []), 4),
@@ -639,6 +780,8 @@ def infer_skill_category_order_key(role_family: str) -> str:
     for known_family, key in ROLE_FAMILY_TO_SKILL_ORDER_KEY.items():
         if known_family in family:
             return key
+    if "gtm" in family or "go-to-market" in family or "go to market" in family or "revops" in family or "revenue engineering" in family:
+        return "gtm_engineering"
     if "data" in family or "analytics" in family:
         return "data_engineering"
     if "platform" in family or "distributed" in family or "infrastructure" in family:
@@ -647,6 +790,12 @@ def infer_skill_category_order_key(role_family: str) -> str:
         return "embedded_systems"
     if "solution" in family or "implementation" in family:
         return "solutions_engineering"
+    if "marketing analyst" in family:
+        return "analyst_marketing"
+    if "business analyst" in family or "operations analyst" in family:
+        return "analyst_business"
+    if "analyst" in family or "analytics" in family:
+        return "analyst_data"
     if "ai" in family:
         return "ai_application"
     if "backend" in family:
@@ -656,6 +805,28 @@ def infer_skill_category_order_key(role_family: str) -> str:
 
 def skill_category_order_for_key(order_key: str) -> list[str]:
     return list(SKILL_CATEGORY_ORDER_TEMPLATES.get(order_key, SKILL_CATEGORY_ORDER_TEMPLATES["fullstack_product"]))
+
+
+def infer_prompt_family_key(role_family: str) -> str:
+    family = (role_family or "").strip().lower()
+    for known_family, key in ROLE_FAMILY_TO_PROMPT_FAMILY_KEY.items():
+        if known_family in family:
+            return key
+    if "gtm" in family or "go-to-market" in family or "go to market" in family or "revops" in family or "revenue engineering" in family:
+        return "gtm_engineering"
+    if "marketing analyst" in family:
+        return "analyst_marketing"
+    if "business analyst" in family or "operations analyst" in family:
+        return "analyst_business"
+    if "analyst" in family or "analytics" in family:
+        return "analyst_data"
+    if "data engineering" in family:
+        return "data_engineering"
+    if "platform" in family or "distributed" in family or "infrastructure" in family or "system software" in family:
+        return "platform_systems"
+    if "solution" in family or "implementation" in family:
+        return "solutions_customer"
+    return "software_engineering"
 
 
 def normalize_skills_for_order(skills_payload: dict, ordered_categories: list[str]) -> dict:
@@ -683,12 +854,18 @@ def build_ai_analysis_prompt() -> str:
             "Analyze the JD and return a compact role model for downstream resume generation.",
             "Do not mirror the JD or invent unsupported domain expertise.",
             "Infer the company context, role family, problem, system, skills and technologies mentioned, and behavioral signals.",
-            "Role family must describe the actual engineering shape of the job, not a generic software-engineer label.",
-            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, solutions engineering, implementation engineering, or AI application engineering.",
-            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, platform_distributed, embedded_systems, ai_application, solutions_engineering.",
+            "Role family must describe the actual job shape, not a generic software-engineer label.",
+            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, solutions engineering, implementation engineering, AI application engineering, data analyst, business analyst, marketing analyst, product analyst, operations analyst, or GTM engineering.",
+            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, platform_distributed, embedded_systems, ai_application, solutions_engineering, analyst_data, analyst_business, analyst_marketing, gtm_engineering.",
             "Pick the skill_category_order_key that best fits the role family and technical center of the JD.",
+            "Choose exactly one prompt_family_key from this fixed set: software_engineering, data_engineering, platform_systems, analyst_data, analyst_business, analyst_marketing, solutions_customer, gtm_engineering.",
+            "Pick the prompt_family_key that best matches the role family and what the later prompts should optimize for.",
             "If the JD centers on SQL, PySpark, Snowflake, ETL, orchestration, dashboards, or data quality, classify it as data engineering or analytics engineering rather than generic software engineering.",
             "If the JD centers on Rust, Linux, concurrency, networking, security platforms, or low-level services, classify it as platform engineering or distributed systems engineering rather than generic full-stack work.",
+            "If the JD centers on reporting, dashboards, SQL analysis, business insights, stakeholder support, campaign measurement, attribution, funnel metrics, requirements gathering, or KPI analysis, classify it as an analyst family rather than software engineering.",
+            "If the JD centers on CRM systems, revops, lead routing, enrichment, outbound tooling, lifecycle automation, sequencing, GTM workflows, pipeline reporting, or sales/marketing system automation, classify it as GTM engineering rather than software engineering or generic analyst work.",
+            "If the JD mentions Excel, Power BI, Tableau, Looker, Jira, Confluence, Salesforce, SAP, Oracle, Workday, PeopleSoft, Banner, WMS, Manhattan SCALE, Manhattan Active, Blue Yonder, ERP, SCM, or CRM platforms, preserve those as important analyst or systems signals rather than treating them like minor supporting tools.",
+            "If the JD mentions Clay, Salesforce, HubSpot, Outreach, Apollo, Marketo, 6sense, Gong, Customer.io, ZoomInfo, Smartlead, Instantly, HeyReach, Nooks, Warmly, lead routing, enrichment, outbound sequencing, or GTM automation, preserve those as important GTM systems and workflow signals.",
             "Return one unified skills_mentioned list containing all important skills, tools, frameworks, platforms, and technologies explicitly mentioned anywhere in the JD, including required, preferred, and nice-to-have items.",
             "Return only structured analysis matching the schema.",
         ]
@@ -706,7 +883,7 @@ def build_ai_resume_prompt() -> str:
     return "\n".join(
         [
             "You are a resume reconstruction engine.",
-            "Your job is to build a realistic, production-level Software Engineer resume aligned to a given job description.",
+            "Your job is to build a realistic, production-level targeted resume aligned to a given job description.",
             "This resume is a targeted fit document, not a full professional biography.",
             "Its job is to help a recruiter quickly see why this candidate is a strong fit and move to the next step.",
             "",
@@ -753,6 +930,8 @@ def build_ai_resume_prompt() -> str:
             "- Align to the company's problem space without claiming direct domain expertise unless it is clearly grounded by prior experience",
             "- Prefer broader believable product or workflow framing over company-specific domain claims when the domain match is only transferable",
             "- For customer-facing solutions / FAE / technical pre-sales roles, do not imply direct domain ownership or hardware expertise unless clearly grounded by prior experience",
+            "- Use natural first-pass recruiter language, not compressed jargon blocks",
+            "- Keep the summary readable in one pass; do not stack too many systems or tools into a single clause",
             "",
             "SKILLS:",
             "- Category: comma-separated values only",
@@ -815,6 +994,7 @@ def build_ai_resume_prompt() -> str:
             "  - or engineering decision such as caching, batching, async, indexing",
             "- At least one measurable metric such as %, latency, scale, volume, or count",
             "- Use active language and show what changed because of the work",
+            "- Keep one main idea per bullet; do not cram multiple unrelated systems into the same sentence",
             "",
             "ANTI-GENERIC FILTER:",
             "Before finalizing each bullet, ask:",
@@ -887,6 +1067,15 @@ def build_ai_resume_prompt() -> str:
             "- The result should read like authentic resume writing from a strong engineer, not marketing copy",
             "- If a summary or bullet sounds like benchmark distributed-systems copy, simplify it into more natural resume language",
             "- Prefer natural title and summary phrasing that a hiring manager would recognize instantly without mentally rewriting it",
+            "- Prefer simpler sentence structure over dense, over-engineered wording",
+            "- Avoid stacked noun phrases like 'lead-to-cash and ingestion/retrieval systems' when a simpler phrase would say the same thing",
+            "- Avoid resume bullets that sound too perfectly templated; natural variation is better than rigid symmetry",
+            "",
+            "HUMANIZATION EXAMPLES:",
+            "- Less human: 'Led GTM platform delivery by designing lead-to-cash and ingestion/retrieval systems using APIs, Salesforce, and middleware under tight SLAs, improving pipeline visibility by 28%.'",
+            "- More human: 'Built automated lead-routing and reporting workflows across Salesforce and middleware, improving pipeline visibility and cutting manual handoffs for GTM teams.'",
+            "- Less human: 'Directed applied-AI retrieval workflows using APIs and Python under privacy and latency constraints, delivering a 22% improvement in relevancy.'",
+            "- More human: 'Improved retrieval workflows in Python and APIs, raising result quality while keeping latency and privacy requirements in line for customer-facing search.'",
             "",
             "TIMELINE RULE:",
             "- Ensure realistic technology progression across roles",
@@ -934,9 +1123,11 @@ def build_ai_resume_core_prompt() -> str:
             "- Include systems built, technologies used, and problems solved",
             "- Do not dump tools or force exact years unless clearly grounded",
             "- Use nondramatic, recruiter-readable language",
+            "- Keep the writing easy to scan in one pass; avoid dense multi-clause phrasing and stacked jargon",
             "- Match the summary style to the JD family: systems/reliability for platform roles, ownership/delivery for senior backend roles, and customer-facing integration/adoption support for solutions or pre-sales roles",
             "- Align to the company's domain without pretending direct domain specialization when the evidence is only adjacent or transferable",
             "- For customer-facing solutions / FAE / technical pre-sales roles, pivot the summary without pretending the candidate held that exact title historically",
+            "- Prefer one clear positioning statement over two compressed half-ideas",
             "",
             "SKILLS RULES:",
             "- Category: comma-separated values only",
@@ -966,13 +1157,63 @@ def build_ai_resume_core_prompt() -> str:
             "- Align naturally to the JD",
             "- Keep human readability first",
             "- Sound like authentic resume writing, not marketing copy",
+            "- If a skill name feels like a fragment from a sentence rather than a real recruiter-scan term, rewrite it",
+            "- Do not leave truncated or malformed items in the final section",
             "",
             "Return only the final result matching the schema.",
         ]
     )
 
 
-def build_ai_resume_title_summary_prompt() -> str:
+def build_ai_resume_title_summary_prompt(prompt_family_key: str = "software_engineering") -> str:
+    family_rules = {
+        "software_engineering": [
+            "- adapt by role family, culture signals, and the skills, responsibilities, and workflows mentioned in the analysis object",
+            "- surface the strongest JD-mentioned technologies and workflows naturally in the summary when they fit the candidate-shaped story",
+            "- platform roles: emphasize systems, reliability, APIs, scale",
+            "- backend delivery roles: emphasize ownership, execution, architecture",
+            "- customer-facing solutions roles: emphasize integrations, troubleshooting, technical communication",
+        ],
+        "data_engineering": [
+            "- adapt by role family and emphasize SQL, pipelines, warehousing, orchestration, data quality, and reliable data delivery",
+            "- mention frontend work only as supporting capability for data users when relevant",
+            "- keep the summary focused on data systems and operational outcomes rather than generic software engineering language",
+        ],
+        "platform_systems": [
+            "- emphasize scale, reliability, APIs, observability, and system performance",
+            "- prioritize platform constraints, architecture tradeoffs, and resilient delivery over product UI language",
+        ],
+        "analyst_data": [
+            "- emphasize SQL, dashboards, reporting, insights, metrics, and stakeholder decision support",
+            "- frame the role around analysis, measurement, and business impact rather than software delivery",
+            "- mention tools and workflows that support insight generation, experimentation, and communication",
+            "- preserve analyst stack terms like Excel, Power BI, Tableau, Looker, and domain systems when the JD mentions them",
+            "- if the JD does not explicitly mention a named analyst tool or platform, use generic analyst workflow language instead of inventing one",
+        ],
+        "analyst_business": [
+            "- emphasize requirements, process analysis, KPI reporting, stakeholder communication, and turning findings into execution plans",
+            "- frame the role around business workflows, analysis, and cross-functional clarity rather than engineering implementation",
+            "- preserve business-system and operations tools like Excel, Jira, Confluence, ERP, WMS, CRM, SAP, Oracle, Workday, PeopleSoft, Banner, Manhattan, and Blue Yonder when they are mentioned",
+            "- if the JD does not explicitly mention a named enterprise platform, use generic analyst and process language instead of inventing one",
+        ],
+        "analyst_marketing": [
+            "- emphasize campaign analysis, attribution, funnel metrics, experimentation, and marketing reporting",
+            "- frame the role around growth insights, customer behavior analysis, and cross-functional communication rather than engineering delivery",
+            "- preserve marketing analytics and reporting tools like Excel, BI platforms, CRM systems, and attribution-oriented tooling when the JD mentions them",
+            "- if the JD does not explicitly mention a named marketing or CRM platform, use generic analytics language instead of inventing one",
+        ],
+        "gtm_engineering": [
+            "- emphasize GTM automation, CRM and revops workflows, routing, enrichment, outbound systems, reporting, and cross-functional execution",
+            "- frame the role around building and improving go-to-market systems rather than generic product engineering or generic analysis work",
+            "- preserve GTM stack terms like Clay, Salesforce, HubSpot, Outreach, Apollo, Marketo, 6sense, Gong, Customer.io, ZoomInfo, and sequencing or enrichment tools when the JD mentions them",
+            "- if the JD does not explicitly mention a named GTM platform, use generic GTM workflow language instead of inventing one",
+        ],
+        "solutions_customer": [
+            "- emphasize integrations, troubleshooting, technical communication, stakeholder support, and adoption outcomes",
+            "- keep the tone customer-facing and execution-oriented without pretending the candidate held the exact target title historically",
+        ],
+    }
+    selected_rules = family_rules.get(prompt_family_key, family_rules["software_engineering"])
     return "\n".join(
         [
             "You are a resume reconstruction engine.",
@@ -996,20 +1237,63 @@ def build_ai_resume_title_summary_prompt() -> str:
             "- align to the company's domain without overclaiming direct domain expertise",
             "- do not echo company marketing language, product slogans, or copied business phrasing from the JD",
             "- prefer transferable product and workflow framing over company-specific wording when the domain match is only adjacent",
-            "- adapt by role family, culture signals, and the skills, responsibilities, and workflows mentioned in the analysis object",
-            "- surface the strongest JD-mentioned technologies and workflows naturally in the summary when they fit the candidate-shaped story",
-            "- platform roles: emphasize systems, reliability, APIs, scale",
-            "- backend delivery roles: emphasize ownership, execution, architecture",
-            "- customer-facing solutions roles: emphasize integrations, troubleshooting, technical communication",
-            "- data engineering or analytics engineering roles: emphasize SQL, pipelines, warehousing, orchestration, data quality, and how frontend work supports data users rather than treating the role like generic software engineering",
-            "- AI application roles: emphasize workflow automation, LLM integration, product iteration, and grounded delivery rather than generic platform language",
+            "- keep the phrasing natural and easy to read aloud; avoid dense stacked clauses and resume-speak",
+            "- prefer one clear central idea over a list-like sentence full of tools and workflows",
+            *selected_rules,
             "",
             "Return only the final result matching the schema.",
         ]
     )
 
 
-def build_ai_resume_skills_prompt() -> str:
+def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering") -> str:
+    family_rules = {
+        "software_engineering": [
+            "- keep JD-mentioned languages, frameworks, platforms, and tools visible when they fit the category",
+            "- balance concrete technologies with practical engineering capabilities",
+        ],
+        "data_engineering": [
+            "- prioritize SQL, warehousing, pipelines, orchestration, data quality, and data modeling terms",
+            "- keep frontend or API tools secondary unless the JD clearly makes them central",
+        ],
+        "platform_systems": [
+            "- prioritize platform, reliability, observability, distributed-systems, and infrastructure terms",
+            "- prefer concrete systems tools and capabilities over product-oriented frontend language",
+        ],
+        "analyst_data": [
+            "- prioritize SQL, querying, dashboards, reporting, data visualization, metrics, and experimentation terms",
+            "- prefer analysis tools, BI platforms, and insight-generation capabilities over engineering infrastructure categories",
+            "- preserve Excel, Power BI, Tableau, Looker, Python, R, and domain reporting systems prominently when the JD mentions them",
+            "- if the JD does not explicitly mention a named analyst tool, do not invent one; use strong generic analyst capabilities instead",
+            "- for analyst roles, keep process, reporting, stakeholder, and KPI terms in the analyst categories instead of forcing them into engineering categories",
+        ],
+        "analyst_business": [
+            "- prioritize business analysis, reporting, requirements, process improvement, KPI tracking, and stakeholder communication terms",
+            "- prefer workflow, planning, and insight-delivery capabilities over software-engineering abstractions",
+            "- preserve Excel, BI tools, Jira, Confluence, ERP, WMS, CRM, SAP, Oracle, Workday, PeopleSoft, Banner, Manhattan, and Blue Yonder terms prominently when the JD mentions them",
+            "- if the JD does not explicitly mention a named enterprise platform, do not invent one; use generic business-analysis capabilities instead",
+            "- keep budget tracking, risk management, traceability, UAT, and stakeholder work inside analyst-oriented categories rather than engineering categories",
+        ],
+        "analyst_marketing": [
+            "- prioritize campaign analysis, attribution, funnel metrics, experimentation, segmentation, dashboards, and reporting terms",
+            "- prefer growth, lifecycle, and measurement capabilities over engineering infrastructure categories",
+            "- preserve Excel, BI tools, CRM tools, Salesforce, and attribution or lifecycle measurement terms prominently when the JD mentions them",
+            "- if the JD does not explicitly mention a named marketing platform, do not invent one; use generic marketing-analytics capabilities instead",
+            "- keep campaign metrics, segmentation, reporting, and stakeholder insights inside analyst-oriented categories rather than engineering categories",
+        ],
+        "gtm_engineering": [
+            "- prioritize CRM workflows, GTM automation, routing, enrichment, outbound systems, pipeline reporting, and revops terms",
+            "- prefer practical workflow and systems terminology over generic software-engineering abstractions",
+            "- preserve GTM stack tools like Clay, Salesforce, HubSpot, Outreach, Apollo, Marketo, 6sense, Gong, Customer.io, ZoomInfo, Smartlead, Instantly, HeyReach, Nooks, and Warmly when the JD mentions them",
+            "- if the JD does not explicitly mention a named GTM tool, do not invent one; use strong generic GTM workflow capabilities instead",
+            "- keep reporting, pipeline visibility, lifecycle operations, stakeholder coordination, and experiment-oriented skills inside GTM-oriented categories rather than generic engineering ones",
+        ],
+        "solutions_customer": [
+            "- prioritize integrations, troubleshooting, customer-facing platforms, reporting, and communication-friendly technical tools",
+            "- keep the section practical and delivery-oriented rather than deeply platform-centric",
+        ],
+    }
+    selected_rules = family_rules.get(prompt_family_key, family_rules["software_engineering"])
     return "\n".join(
         [
             "You are a resume reconstruction engine.",
@@ -1027,10 +1311,12 @@ def build_ai_resume_skills_prompt() -> str:
             "- each item must be one short skill name or capability name",
             "- no explanations, no qualifier text, no mini-sentences",
             "- prefer concrete technologies and concise capability names",
-            "- keep JD-mentioned languages, frameworks, platforms, and tools visible when they fit the category",
             "- do not use vague filler like 'data-driven solutions', 'deployment strategies', or 'technical discussions'",
             "- do not repeat the same concept across categories",
             "- skip a category only if it is truly irrelevant; otherwise fill it with 2-5 strong items",
+            "- each item must read like a real resume skill, not a broken fragment or half sentence",
+            "- if an item looks truncated, awkward, or too descriptive, rewrite it into a clean recruiter-scan term",
+            *selected_rules,
             "- expected style:",
             "  - Programming Languages: TypeScript, JavaScript, Python",
             "  - Backend Engineering: Node.js, GraphQL, REST API design",
@@ -1041,7 +1327,7 @@ def build_ai_resume_skills_prompt() -> str:
     )
 
 
-def build_ai_resume_experience_prompt() -> str:
+def build_ai_resume_experience_prompt(prompt_family_key: str = "software_engineering") -> str:
     blueprint_lines = []
     for blueprint in EXPERIENCE_BLUEPRINTS:
         bullet_rule = f"{blueprint['bullet_min']}" if blueprint["bullet_min"] == blueprint["bullet_max"] else f"{blueprint['bullet_min']}-{blueprint['bullet_max']}"
@@ -1049,10 +1335,50 @@ def build_ai_resume_experience_prompt() -> str:
             f"- {blueprint['company']} | {blueprint['location']} | {blueprint['dates']} | bullets: {bullet_rule} | anchor: {blueprint['anchor']}"
         )
 
+    family_rules = {
+        "software_engineering": [
+            "- recent roles should highlight implementation, APIs, systems, delivery, and engineering impact",
+        ],
+        "data_engineering": [
+            "- recent roles should highlight pipelines, warehousing, orchestration, data quality, reporting data flows, and measurable operational improvement",
+            "- describe systems and workflows in data terms rather than generic product-engineering language",
+        ],
+        "platform_systems": [
+            "- recent roles should highlight scale, observability, reliability, infrastructure, and performance tradeoffs",
+        ],
+        "analyst_data": [
+            "- recent roles should highlight SQL analysis, dashboards, reporting, experimentation, insight delivery, and decision support",
+            "- describe workflows and outcomes in analyst terms rather than engineering implementation language",
+            "- prioritize metrics, reporting accuracy, adoption, time saved, reconciliation, data validation, and stakeholder-facing outcomes when they fit the candidate-shaped story",
+            "- if the JD does not mention named analyst tools, keep bullets tool-light and workflow-heavy instead of inventing platforms",
+        ],
+        "analyst_business": [
+            "- recent roles should highlight requirements, process analysis, KPI reporting, stakeholder communication, and turning findings into action",
+            "- use analyst-style business workflow language rather than engineering-system language where appropriate",
+            "- prioritize process improvement, requirements clarity, UAT, reporting accuracy, reconciliation, turnaround time, and stakeholder alignment outcomes",
+            "- if the JD does not mention named enterprise platforms, keep bullets tool-light and process-heavy instead of inventing systems",
+        ],
+        "analyst_marketing": [
+            "- recent roles should highlight campaign measurement, attribution, funnel analysis, segmentation, reporting, and growth insights",
+            "- use marketing and analytics workflow language rather than engineering-system language where appropriate",
+            "- prioritize conversion metrics, campaign performance, cohort insights, attribution, reporting adoption, and experiment outcomes",
+            "- if the JD does not mention named marketing tools, keep bullets tool-light and measurement-heavy instead of inventing platforms",
+        ],
+        "gtm_engineering": [
+            "- recent roles should highlight CRM and revops workflows, GTM automation, routing, enrichment, outbound systems, reporting, and cross-functional execution",
+            "- use GTM systems and operations language rather than generic product-engineering or generic analyst language where appropriate",
+            "- prioritize pipeline visibility, lifecycle automation, routing accuracy, enrichment quality, campaign or outbound efficiency, and stakeholder adoption outcomes",
+            "- if the JD does not mention named GTM tools, keep bullets tool-light and workflow-heavy instead of inventing platforms",
+            "- only use named GTM platforms that already appear in the JD or selected skills; otherwise use generic phrases like CRM workflow, enrichment workflow, sequencing platform, or middleware",
+        ],
+        "solutions_customer": [
+            "- recent roles should highlight integrations, troubleshooting, customer support, demos, adoption, and technical communication",
+        ],
+    }
     return "\n".join(
         [
             "You are a resume reconstruction engine.",
-            "Build only the Professional Experience section for a tailored Software Engineer resume.",
+            "Build only the Professional Experience section for a tailored target-fit resume.",
             "Assume the candidate has 4+ years of experience.",
             "Use the JD analysis and the existing core resume sections as the source of truth.",
             "Do not mirror the JD. Do not invent unrealistic tools or fake expertise.",
@@ -1066,6 +1392,7 @@ def build_ai_resume_experience_prompt() -> str:
             "- Bullet count per company must match exactly",
             "- Each bullet must be 25-30 words",
             "- Recent and relevant roles should do more of the selling",
+            *family_rules.get(prompt_family_key, family_rules["software_engineering"]),
             "",
             "BULLET FORMULA:",
             "[Strong Verb] + [System built/optimized] + using [1-3 tools] + under [constraint or engineering decision] + resulting in [measurable impact].",
@@ -1076,11 +1403,14 @@ def build_ai_resume_experience_prompt() -> str:
             "- a constraint or engineering decision",
             "- a measurable metric",
             "- active language showing what changed because of the work",
+            "- one main accomplishment per bullet",
+            "- natural sentence flow instead of visibly templated clause stacking",
             "",
             "ORIGINALITY AND GROUNDING RULES:",
             "- Preserve originality",
             "- Prefer simpler believable technical wording over named-tool substitution",
             "- Do not introduce named infrastructure products unless they materially improve clarity and feel realistically grounded",
+            "- Do not introduce named platforms, products, or vendors that are missing from the JD or selected skills just because they are common for the role family",
             "- If a bullet sounds like benchmark distributed-systems copy, simplify it into more natural resume language",
             "- Tailor by emphasis and detail selection, not by rewriting history",
             "- If the target role is FAE, solutions engineering, sales engineering, or technical pre-sales, preserve believable engineering titles and shift the bullets toward demos, integrations, troubleshooting, customer communication, and adoption support only where that remains grounded",
@@ -1102,7 +1432,7 @@ def build_ai_resume_experience_prompt() -> str:
     )
 
 
-def build_ai_resume_experience_subset_prompt(blueprints: list[dict]) -> str:
+def build_ai_resume_experience_subset_prompt(blueprints: list[dict], prompt_family_key: str = "software_engineering") -> str:
     blueprint_lines = []
     for blueprint in blueprints:
         bullet_rule = f"{blueprint['bullet_min']}" if blueprint["bullet_min"] == blueprint["bullet_max"] else f"{blueprint['bullet_min']}-{blueprint['bullet_max']}"
@@ -1110,6 +1440,46 @@ def build_ai_resume_experience_subset_prompt(blueprints: list[dict]) -> str:
             f"- {blueprint['key']} | {blueprint['company']} | {blueprint['location']} | {blueprint['dates']} | bullets: {bullet_rule} | anchor: {blueprint['anchor']}"
         )
 
+    family_rules = {
+        "software_engineering": [
+            "- selected skills should guide the stack used in bullets; do not invent a different stack from the skills section",
+        ],
+        "data_engineering": [
+            "- selected skills should guide the stack used in bullets; prioritize SQL, pipelines, warehousing, orchestration, and data-quality workflows",
+            "- describe systems and impacts in data workflow terms",
+        ],
+        "platform_systems": [
+            "- selected skills should guide the stack used in bullets; prioritize infrastructure, reliability, observability, scale, and system tradeoffs",
+        ],
+        "analyst_data": [
+            "- selected skills should guide the stack used in bullets; prioritize reporting, SQL analysis, dashboards, experimentation, and insight delivery",
+            "- use workflow, stakeholder, and business-impact framing rather than engineering implementation framing when appropriate",
+            "- prefer analyst proof points such as reporting adoption, accuracy, time saved, reconciliation, KPI visibility, and decision support impact",
+            "- do not introduce named BI or analyst tools in bullets unless the JD or selected skills already include them",
+        ],
+        "analyst_business": [
+            "- selected skills should guide the stack used in bullets; prioritize requirements, process analysis, reporting, KPI tracking, and stakeholder communication",
+            "- use business workflow framing rather than engineering implementation framing when appropriate",
+            "- prefer analyst proof points such as UAT, requirements clarity, process-cycle reduction, reporting accuracy, exception handling, and stakeholder alignment",
+            "- do not introduce named ERP, WMS, CRM, or enterprise tools in bullets unless the JD or selected skills already include them",
+        ],
+        "analyst_marketing": [
+            "- selected skills should guide the stack used in bullets; prioritize campaign reporting, attribution, funnel analysis, experimentation, and growth insights",
+            "- use marketing workflow framing rather than engineering implementation framing when appropriate",
+            "- prefer analyst proof points such as campaign lift, funnel conversion, cohort trends, reporting adoption, and experiment outcomes",
+            "- do not introduce named CRM, BI, or marketing platforms in bullets unless the JD or selected skills already include them",
+        ],
+        "gtm_engineering": [
+            "- selected skills should guide the stack used in bullets; prioritize CRM workflows, GTM automation, routing, enrichment, outbound systems, reporting, and revops coordination",
+            "- use GTM workflow framing rather than generic product-engineering language when appropriate",
+            "- prefer GTM proof points such as routing accuracy, enrichment coverage, pipeline visibility, campaign or outbound efficiency, adoption, and stakeholder alignment outcomes",
+            "- do not introduce named GTM, CRM, sequencing, or enrichment platforms in bullets unless the JD or selected skills already include them",
+            "- if a named GTM tool is not already present in the JD or selected skills, rewrite it as a generic workflow or platform reference instead of adding the tool name",
+        ],
+        "solutions_customer": [
+            "- selected skills should guide the stack used in bullets; prioritize integrations, troubleshooting, customer enablement, and adoption support",
+        ],
+    }
     return "\n".join(
         [
             "You are a resume reconstruction engine.",
@@ -1145,10 +1515,14 @@ def build_ai_resume_experience_subset_prompt(blueprints: list[dict]) -> str:
             "- 1-3 tools or technical skills from the selected skills or supporting stack",
             "- a constraint or engineering decision",
             "- a measurable metric",
-            "- selected skills should guide the stack used in bullets; do not invent a different stack from the skills section",
+            "- one main accomplishment per bullet",
+            *family_rules.get(prompt_family_key, family_rules["software_engineering"]),
             "- older roles should use the lighter, earlier-career portion of the selected skills instead of inheriting the most modern or specialized parts of the stack",
             "- keep KPMG and Trigent technology choices believable for 2020-2022, their company anchors, and normal exposure progression",
             "- do not backfill newer tools, AI frameworks, or unusually convenient target-stack substitutions into older roles unless the anchor strongly supports them",
+            "- if a bullet wants to mention a named platform that is not already in the JD or selected skills, replace it with a generic workflow phrase instead",
+            "- prefer simpler wording over dense clause chains when both communicate the same accomplishment",
+            "- avoid bullets that read like a rigid template; vary rhythm and sentence structure naturally",
             "",
             "Keep each company as one coherent project story.",
             "Prefer believable metrics over suspicious precision.",
@@ -1187,12 +1561,15 @@ def build_ai_reachout_prompt() -> str:
 def build_ai_core_review_prompt() -> str:
     return "\n".join(
         [
-            "You review only the resume summary and skills section for a tailored software-engineering resume.",
+            "You review only the resume summary and skills section for a tailored target-fit resume.",
             "Use the analysis object as the source of truth.",
             "Judge whether the current summary and skills are ready to keep or should be revised.",
-            "Focus on two risks:",
+            "Focus on three risks:",
             "- summary that sounds copied from company or JD wording, too generic, or mis-emphasized for the role",
             "- skills that are too vague, too copied, missing obvious concrete stack, or awkwardly categorized",
+            "- wording that sounds stiff, overpacked, truncated, or visibly AI-generated instead of natural resume writing",
+            "Flag summaries that stack too many tools, systems, or clauses into one sentence.",
+            "Flag skills that read like broken fragments instead of clean recruiter-scan terms.",
             "Do not review professional experience.",
             "Be concise and practical.",
             "Return only the final result matching the schema.",
@@ -1203,7 +1580,7 @@ def build_ai_core_review_prompt() -> str:
 def build_ai_core_correction_prompt() -> str:
     return "\n".join(
         [
-            "You refine only the resume summary and skills section for a tailored software-engineering resume.",
+            "You refine only the resume summary and skills section for a tailored target-fit resume.",
             "Use the analysis object and current draft as the source of truth.",
             "Keep the title unchanged outside the schema; only return Updated Summary and Updated Skills.",
             "Inspect the current summary and skills, improve them only if needed, and otherwise keep them close to the draft.",
@@ -1215,6 +1592,8 @@ def build_ai_core_correction_prompt() -> str:
             "Do not replace strong concrete stack or workflow terms with broader wording just because it sounds cleaner.",
             "If the summary mentions years of experience at all, it must say 4+ years and never anything higher.",
             "Do not copy JD wording directly.",
+            "Make the writing sound human and recruiter-natural, not optimized or assembled.",
+            "Break up dense phrasing, remove stacked jargon, and rewrite truncated skill items into clean terms.",
             "Do not touch professional experience.",
             "Return only the final result matching the schema.",
         ]
@@ -1233,6 +1612,7 @@ def ai_analysis_schema() -> dict:
             "target_role": {"type": "string"},
             "role_family": {"type": "string"},
             "skill_category_order_key": {"type": "string", "enum": sorted(SKILL_CATEGORY_ORDER_TEMPLATES.keys())},
+            "prompt_family_key": {"type": "string", "enum": ["software_engineering", "data_engineering", "platform_systems", "analyst_data", "analyst_business", "analyst_marketing", "solutions_customer", "gtm_engineering"]},
             "core_problem": {"type": "string"},
             "hire_problem": {"type": "string"},
             "desired_outcomes": {"type": "array", "items": {"type": "string"}},
@@ -1251,6 +1631,7 @@ def ai_analysis_schema() -> dict:
             "target_role",
             "role_family",
             "skill_category_order_key",
+            "prompt_family_key",
             "core_problem",
             "hire_problem",
             "desired_outcomes",
@@ -1530,18 +1911,84 @@ def ai_core_correction_schema(allowed_skill_categories: list[str] | None = None)
     }
 
 
-DEFAULT_ROLE_TITLES = {
-    "mckinsey": "Applied AI Engineer / Full Stack Developer",
-    "uber": "Full Stack Developer",
-    "kpmg": "Java Full Stack Developer",
-    "trigent": "Frontend Developer",
+DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY = {
+    "software_engineering": {
+        "mckinsey": "Applied AI Engineer / Full Stack Developer",
+        "uber": "Full Stack Developer",
+        "kpmg": "Java Full Stack Developer",
+        "trigent": "Frontend Developer",
+    },
+    "data_engineering": {
+        "mckinsey": "Data Engineer",
+        "uber": "Data Engineer",
+        "kpmg": "Java Full Stack Developer",
+        "trigent": "Frontend Developer",
+    },
+    "platform_systems": {
+        "mckinsey": "Platform Engineer",
+        "uber": "Platform Engineer",
+        "kpmg": "Software Engineer",
+        "trigent": "Frontend Developer",
+    },
+    "analyst_data": {
+        "mckinsey": "Data Analyst",
+        "uber": "Operations Analyst",
+        "kpmg": "Reporting Analyst",
+        "trigent": "Frontend Developer",
+    },
+    "analyst_business": {
+        "mckinsey": "Business Analyst",
+        "uber": "Operations Analyst",
+        "kpmg": "Business Analyst",
+        "trigent": "Frontend Developer",
+    },
+    "analyst_marketing": {
+        "mckinsey": "Product Analyst",
+        "uber": "Operations Analyst",
+        "kpmg": "Business Analyst",
+        "trigent": "Frontend Developer",
+    },
+    "gtm_engineering": {
+        "mckinsey": "GTM Systems Analyst",
+        "uber": "Business Systems Analyst",
+        "kpmg": "Business Analyst",
+        "trigent": "Frontend Developer",
+    },
+    "solutions_customer": {
+        "mckinsey": "Technical Analyst",
+        "uber": "Technical Analyst",
+        "kpmg": "Business Analyst",
+        "trigent": "Frontend Developer",
+    },
+}
+
+ENGINEERING_TITLE_MARKERS = {
+    "engineer",
+    "developer",
+    "full stack",
+    "frontend",
+    "backend",
+    "applied ai",
 }
 
 
-def sanitize_experience_title(raw_title: str, blueprint: dict) -> str:
+def default_role_title_for_prompt_family(blueprint_key: str, prompt_family_key: str) -> str:
+    family_defaults = DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY.get(
+        prompt_family_key,
+        DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY["software_engineering"],
+    )
+    return family_defaults.get(
+        blueprint_key,
+        DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY["software_engineering"].get(blueprint_key, "Software Engineer"),
+    )
+
+
+def resolve_experience_title(raw_title: str, blueprint: dict, analysis_payload: dict | None = None) -> tuple[str, str | None]:
+    prompt_family_key = infer_prompt_family_key((analysis_payload or {}).get("role_family", ""))
+    fallback_title = default_role_title_for_prompt_family(blueprint["key"], prompt_family_key)
     title = (raw_title or "").strip()
     if not title:
-        return DEFAULT_ROLE_TITLES.get(blueprint["key"], "Software Engineer")
+        return fallback_title, f"{blueprint['company']}: missing experience title; rendered as '{fallback_title}'."
 
     cleaned = title.replace("\n", " ").strip()
     cleaned = re.sub(r"\s*\|\s*", " | ", cleaned)
@@ -1557,7 +2004,7 @@ def sanitize_experience_title(raw_title: str, blueprint: dict) -> str:
 
     # If the title is still effectively empty or just looks like metadata, fall back.
     if not cleaned or cleaned in {blueprint["company"], blueprint["location"], blueprint["dates"]}:
-        return DEFAULT_ROLE_TITLES.get(blueprint["key"], "Software Engineer")
+        return fallback_title, f"{blueprint['company']}: invalid experience title '{title}' replaced with '{fallback_title}'."
 
     # If the model stuffed a whole line with separators, keep only the first non-metadata segment.
     if "|" in cleaned:
@@ -1566,7 +2013,13 @@ def sanitize_experience_title(raw_title: str, blueprint: dict) -> str:
         if segments:
             cleaned = segments[0]
 
-    return cleaned or DEFAULT_ROLE_TITLES.get(blueprint["key"], "Software Engineer")
+    normalized_cleaned = cleaned.lower()
+    if prompt_family_key.startswith("analyst_") and any(marker in normalized_cleaned for marker in ENGINEERING_TITLE_MARKERS):
+        return fallback_title, f"{blueprint['company']}: adjusted experience title '{cleaned}' to '{fallback_title}' for analyst-family resume."
+    if prompt_family_key == "gtm_engineering" and "gtm engineer" not in normalized_cleaned and any(marker in normalized_cleaned for marker in ENGINEERING_TITLE_MARKERS):
+        return fallback_title, f"{blueprint['company']}: adjusted experience title '{cleaned}' to '{fallback_title}' for GTM-family resume."
+
+    return cleaned or fallback_title, None
 
 
 def format_generated_resume_text(resume_payload: dict) -> str:
@@ -1590,9 +2043,10 @@ def format_generated_resume_text(resume_payload: dict) -> str:
     lines.extend(["", "Professional Experience", ""])
 
     experience = resume_payload.get("experience", {})
+    analysis_payload = resume_payload.get("_analysis") or {}
     for blueprint in EXPERIENCE_BLUEPRINTS:
         entry = experience.get(blueprint["key"], {})
-        title = sanitize_experience_title(entry.get("title") or "", blueprint)
+        title, _ = resolve_experience_title(entry.get("title") or "", blueprint, analysis_payload)
         bullets = [bullet.strip() for bullet in entry.get("bullets", []) if bullet.strip()]
 
         lines.append(f"{blueprint['company']} | {blueprint['location']}")
@@ -1662,7 +2116,19 @@ def merge_resume_payloads(core_payload: dict, experience_payload: dict) -> dict:
         "updated_summary": core_payload.get("updated_summary", ""),
         "updated_skills": normalize_updated_skills(core_payload.get("updated_skills", [])),
         "experience": experience_payload.get("experience", {}),
+        "_analysis": core_payload.get("_analysis", {}),
     }
+
+
+def collect_experience_title_warnings(experience_payload: dict, analysis_payload: dict | None = None) -> list[str]:
+    warnings: list[str] = []
+    experience = experience_payload.get("experience") or {}
+    for blueprint in EXPERIENCE_BLUEPRINTS:
+        entry = experience.get(blueprint["key"]) or {}
+        _, warning = resolve_experience_title(entry.get("title") or "", blueprint, analysis_payload)
+        if warning:
+            warnings.append(warning)
+    return warnings
 
 
 def extract_output_text(response_payload: dict) -> str:
@@ -1815,6 +2281,139 @@ def count_words(text: str) -> int:
     return len(re.findall(r"\b[\w%&.+#/-]+\b", text or ""))
 
 
+ANALYST_EXPLICIT_TOOL_TERMS = {
+    "excel",
+    "power bi",
+    "tableau",
+    "looker",
+    "jira",
+    "confluence",
+    "salesforce",
+    "sap",
+    "oracle",
+    "workday",
+    "peoplesoft",
+    "banner",
+    "wms",
+    "crm",
+    "erp",
+    "scm",
+    "manhattan scale",
+    "manhattan active",
+    "blue yonder",
+}
+
+GTM_EXPLICIT_TOOL_TERMS = {
+    "clay",
+    "salesforce",
+    "hubspot",
+    "outreach",
+    "apollo",
+    "marketo",
+    "6sense",
+    "gong",
+    "customer.io",
+    "zoominfo",
+    "smartlead",
+    "instantly",
+    "heyreach",
+    "nooks",
+    "warmly",
+}
+
+
+ANALYST_GENERIC_ALLOWED_ITEMS = {
+    "data analysis",
+    "budget tracking",
+    "risk management",
+    "stakeholder management",
+    "stakeholder communication",
+    "requirements gathering",
+    "requirements documentation",
+    "functional specifications",
+    "process mapping",
+    "gap analysis",
+    "feasibility studies",
+    "audit activities",
+    "audit findings",
+    "uat",
+    "user acceptance testing",
+    "testing scripts",
+    "verification criteria",
+    "kpi tracking",
+    "dashboarding",
+    "dashboards",
+    "trend analysis",
+    "variance reporting",
+    "decision support",
+    "insights synthesis",
+    "reporting",
+    "reporting accuracy",
+    "stakeholder engagement",
+    "cross-functional coordination",
+}
+
+
+def is_analyst_prompt_family(analysis_payload: dict) -> bool:
+    prompt_family = str(analysis_payload.get("prompt_family_key", "")).strip().lower()
+    return prompt_family in {"analyst_data", "analyst_business", "analyst_marketing"}
+
+
+def is_gtm_prompt_family(analysis_payload: dict) -> bool:
+    prompt_family = str(analysis_payload.get("prompt_family_key", "")).strip().lower()
+    return prompt_family == "gtm_engineering"
+
+
+def analyst_tool_not_in_jd(item: str, analysis_payload: dict) -> str | None:
+    lowered_item = normalize_skill_dedupe_key(item)
+    if not lowered_item:
+        return None
+    jd_terms = [normalize_skill_dedupe_key(term) for term in (analysis_payload.get("skills_mentioned") or [])]
+    for tool in ANALYST_EXPLICIT_TOOL_TERMS:
+        if tool in lowered_item:
+            if any(tool in jd_term for jd_term in jd_terms):
+                return None
+            return tool
+    return None
+
+
+def analyst_tool_mentions_not_in_jd(text: str, analysis_payload: dict) -> list[str]:
+    lowered_text = normalize_skill_dedupe_key(text)
+    if not lowered_text:
+        return []
+    jd_terms = [normalize_skill_dedupe_key(term) for term in (analysis_payload.get("skills_mentioned") or [])]
+    unsupported: list[str] = []
+    for tool in sorted(ANALYST_EXPLICIT_TOOL_TERMS):
+        if tool in lowered_text and not any(tool in jd_term for jd_term in jd_terms):
+            unsupported.append(tool)
+    return unsupported
+
+
+def gtm_tool_not_in_jd(item: str, analysis_payload: dict) -> str | None:
+    lowered_item = normalize_skill_dedupe_key(item)
+    if not lowered_item:
+        return None
+    jd_terms = [normalize_skill_dedupe_key(term) for term in (analysis_payload.get("skills_mentioned") or [])]
+    for tool in GTM_EXPLICIT_TOOL_TERMS:
+        if tool in lowered_item:
+            if any(tool in jd_term for jd_term in jd_terms):
+                return None
+            return tool
+    return None
+
+
+def gtm_tool_mentions_not_in_jd(text: str, analysis_payload: dict) -> list[str]:
+    lowered_text = normalize_skill_dedupe_key(text)
+    if not lowered_text:
+        return []
+    jd_terms = [normalize_skill_dedupe_key(term) for term in (analysis_payload.get("skills_mentioned") or [])]
+    unsupported: list[str] = []
+    for tool in sorted(GTM_EXPLICIT_TOOL_TERMS):
+        if tool in lowered_text and not any(tool in jd_term for jd_term in jd_terms):
+            unsupported.append(tool)
+    return unsupported
+
+
 def validate_model_payload(model_payload: dict) -> list[str]:
     issues: list[str] = []
     analysis = model_payload.get("analysis") or {}
@@ -1921,6 +2520,18 @@ def validate_model_payload(model_payload: dict) -> list[str]:
                 issues.append(f"{blueprint['company']} bullet {index} does not clearly follow X-Y-Z structure.")
             if jd_terms and not any(term in lower_bullet for term in jd_terms):
                 issues.append(f"{blueprint['company']} bullet {index} does not use JD-relevant skills or tools.")
+            if is_analyst_prompt_family(analysis):
+                unsupported_tools = analyst_tool_mentions_not_in_jd(bullet, analysis)
+                if unsupported_tools:
+                    issues.append(
+                        f"{blueprint['company']} bullet {index} introduces analyst tools not named in the JD: {', '.join(sorted(set(unsupported_tools)))}."
+                    )
+            if is_gtm_prompt_family(analysis):
+                unsupported_tools = gtm_tool_mentions_not_in_jd(bullet, analysis)
+                if unsupported_tools:
+                    issues.append(
+                        f"{blueprint['company']} bullet {index} introduces GTM tools not named in the JD: {', '.join(sorted(set(unsupported_tools)))}."
+                    )
 
             forbidden_terms = FORBIDDEN_TERMS_BY_COMPANY.get(blueprint["company"], set())
             if forbidden_terms and any(term in lower_bullet for term in forbidden_terms):
@@ -1947,6 +2558,18 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
     summary_word_count = count_words(summary)
     if not summary or not (SUMMARY_WORD_MIN <= summary_word_count <= SUMMARY_WORD_MAX):
         issues.append(f"Updated summary must be {SUMMARY_WORD_MIN}-{SUMMARY_WORD_MAX} words; got {summary_word_count}.")
+    if is_analyst_prompt_family(analysis_payload):
+        unsupported_tools = analyst_tool_mentions_not_in_jd(summary, analysis_payload)
+        if unsupported_tools:
+            issues.append(
+                "Updated summary introduces analyst tools not named in the JD: " + ", ".join(sorted(set(unsupported_tools))) + "."
+            )
+    if is_gtm_prompt_family(analysis_payload):
+        unsupported_tools = gtm_tool_mentions_not_in_jd(summary, analysis_payload)
+        if unsupported_tools:
+            issues.append(
+                "Updated summary introduces GTM tools not named in the JD: " + ", ".join(sorted(set(unsupported_tools))) + "."
+            )
 
     if len(skills) < 6:
         issues.append("Updated skills must contain at least 6 categories.")
@@ -1970,6 +2593,18 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
                 issues.append(f"Skill item '{item}' in '{category}' is malformed.")
             if skill_item_looks_like_model_meta(item):
                 issues.append(f"Skill item '{item}' in '{category}' contains model meta text.")
+            if is_analyst_prompt_family(analysis_payload):
+                unsupported_tool = analyst_tool_not_in_jd(item, analysis_payload)
+                if unsupported_tool:
+                    issues.append(
+                        f"Skill item '{item}' in '{category}' introduces analyst tool '{unsupported_tool}' that the JD did not mention."
+                    )
+            if is_gtm_prompt_family(analysis_payload):
+                unsupported_tool = gtm_tool_not_in_jd(item, analysis_payload)
+                if unsupported_tool:
+                    issues.append(
+                        f"Skill item '{item}' in '{category}' introduces GTM tool '{unsupported_tool}' that the JD did not mention."
+                    )
 
     if not analysis_payload.get("core_problem"):
         issues.append("Analysis is missing core_problem.")
@@ -1979,7 +2614,7 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
     return issues
 
 
-def validate_title_summary_payload(title_summary_payload: dict, *, summary_max_buffer: int = 0) -> list[str]:
+def validate_title_summary_payload(title_summary_payload: dict, analysis_payload: dict | None = None, *, summary_max_buffer: int = 0) -> list[str]:
     issues: list[str] = []
     title = str(title_summary_payload.get("updated_title", "")).strip()
     summary = str(title_summary_payload.get("updated_summary", "")).strip()
@@ -2003,6 +2638,19 @@ def validate_title_summary_payload(title_summary_payload: dict, *, summary_max_b
                     f"Updated summary must be {SUMMARY_WORD_MIN}-{SUMMARY_WORD_MAX} words; buffer allows up to {summary_word_max}. Got {summary_word_count}."
                 )
 
+    if analysis_payload and is_analyst_prompt_family(analysis_payload):
+        unsupported_tools = analyst_tool_mentions_not_in_jd(summary, analysis_payload)
+        if unsupported_tools:
+            issues.append(
+                "Updated summary introduces analyst tools not named in the JD: " + ", ".join(sorted(set(unsupported_tools))) + "."
+            )
+    if analysis_payload and is_gtm_prompt_family(analysis_payload):
+        unsupported_tools = gtm_tool_mentions_not_in_jd(summary, analysis_payload)
+        if unsupported_tools:
+            issues.append(
+                "Updated summary introduces GTM tools not named in the JD: " + ", ".join(sorted(set(unsupported_tools))) + "."
+            )
+
     return issues
 
 
@@ -2025,6 +2673,19 @@ def validate_skills_only_payload(skills_payload: dict, analysis_payload: dict) -
             issues.append(f"Unsupported skills category: {category}.")
         if len(items) < 2:
             issues.append(f"Skills category '{category}' must contain at least 2 skills.")
+        for item in items:
+            if is_analyst_prompt_family(analysis_payload):
+                unsupported_tool = analyst_tool_not_in_jd(item, analysis_payload)
+                if unsupported_tool:
+                    issues.append(
+                        f"Skill item '{item}' in '{category}' introduces analyst tool '{unsupported_tool}' that the JD did not mention."
+                    )
+            if is_gtm_prompt_family(analysis_payload):
+                unsupported_tool = gtm_tool_not_in_jd(item, analysis_payload)
+                if unsupported_tool:
+                    issues.append(
+                        f"Skill item '{item}' in '{category}' introduces GTM tool '{unsupported_tool}' that the JD did not mention."
+                    )
     if not analysis_payload.get("core_problem"):
         issues.append("Analysis is missing core_problem.")
     return issues
@@ -2041,6 +2702,32 @@ def validate_experience_subset_payload(experience_payload: dict, blueprints: lis
             issues.append(f"{blueprint['company']} is missing a role title.")
         if not (blueprint["bullet_min"] <= len(bullets) <= blueprint["bullet_max"]):
             issues.append(f"{blueprint['company']} must have {blueprint['bullet_min']}-{blueprint['bullet_max']} bullets.")
+    return issues
+
+
+def validate_experience_subset_payload_with_analysis(experience_payload: dict, blueprints: list[dict], analysis_payload: dict) -> list[str]:
+    issues = validate_experience_subset_payload(experience_payload, blueprints)
+    if not is_analyst_prompt_family(analysis_payload):
+        if not is_gtm_prompt_family(analysis_payload):
+            return issues
+
+    experience = experience_payload.get("experience") or {}
+    for blueprint in blueprints:
+        entry = experience.get(blueprint["key"]) or {}
+        bullets = [str(bullet).strip() for bullet in entry.get("bullets", []) if str(bullet).strip()]
+        for index, bullet in enumerate(bullets, start=1):
+            if is_analyst_prompt_family(analysis_payload):
+                unsupported_tools = analyst_tool_mentions_not_in_jd(bullet, analysis_payload)
+                if unsupported_tools:
+                    issues.append(
+                        f"{blueprint['company']} bullet {index} introduces analyst tools not named in the JD: {', '.join(sorted(set(unsupported_tools)))}."
+                    )
+            if is_gtm_prompt_family(analysis_payload):
+                unsupported_tools = gtm_tool_mentions_not_in_jd(bullet, analysis_payload)
+                if unsupported_tools:
+                    issues.append(
+                        f"{blueprint['company']} bullet {index} introduces GTM tools not named in the JD: {', '.join(sorted(set(unsupported_tools)))}."
+                    )
     return issues
 
 
@@ -2178,11 +2865,14 @@ def generate_title_summary_from_analysis(
     analysis_payload: dict,
 ) -> dict:
     compact_analysis = compact_analysis_for_generation(analysis_payload)
+    prompt_family_key = str(analysis_payload.get("prompt_family_key", "")).strip() or infer_prompt_family_key(
+        analysis_payload.get("role_family", "")
+    )
     return call_openai_structured_output(
         api_key=api_key,
         model=RESUME_MODEL,
         temperature=RESUME_TEMPERATURE,
-        developer_prompt=build_ai_resume_title_summary_prompt(),
+        developer_prompt=build_ai_resume_title_summary_prompt(prompt_family_key),
         user_prompt="Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
         schema_name="resume_title_summary_generation",
         schema=ai_title_summary_schema(),
@@ -2198,6 +2888,9 @@ def generate_skills_from_analysis(
     analysis_payload: dict,
 ) -> dict:
     compact_analysis = compact_analysis_for_generation(analysis_payload)
+    prompt_family_key = str(analysis_payload.get("prompt_family_key", "")).strip() or infer_prompt_family_key(
+        analysis_payload.get("role_family", "")
+    )
     order_key = str(analysis_payload.get("skill_category_order_key", "")).strip() or infer_skill_category_order_key(
         analysis_payload.get("role_family", "")
     )
@@ -2206,7 +2899,7 @@ def generate_skills_from_analysis(
         api_key=api_key,
         model=ANALYSIS_MODEL,
         temperature=ANALYSIS_TEMPERATURE,
-        developer_prompt=build_ai_resume_skills_prompt(),
+        developer_prompt=build_ai_resume_skills_prompt(prompt_family_key),
         user_prompt="\n\n".join(
             [
                 "Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
@@ -2311,6 +3004,9 @@ def generate_resume_experience_from_analysis(
     memory_block: str = "",
 ) -> dict:
     compact_analysis = compact_analysis_for_generation(analysis_payload)
+    prompt_family_key = str(analysis_payload.get("prompt_family_key", "")).strip() or infer_prompt_family_key(
+        analysis_payload.get("role_family", "")
+    )
     compact_core = {
         "updated_title": str(core_payload.get("updated_title", "")).strip(),
         "updated_summary": str(core_payload.get("updated_summary", "")).strip(),
@@ -2335,7 +3031,7 @@ def generate_resume_experience_from_analysis(
         api_key=api_key,
         model=RESUME_MODEL,
         temperature=RESUME_TEMPERATURE,
-        developer_prompt=build_ai_resume_experience_prompt(),
+        developer_prompt=build_ai_resume_experience_prompt(prompt_family_key),
         user_prompt="\n\n".join(user_parts),
         schema_name="resume_experience_generation",
         schema=ai_experience_schema(),
@@ -2355,6 +3051,9 @@ def generate_experience_subset_from_analysis(
     timeout_seconds: int,
 ) -> dict:
     compact_analysis = compact_analysis_for_generation(analysis_payload)
+    prompt_family_key = str(analysis_payload.get("prompt_family_key", "")).strip() or infer_prompt_family_key(
+        analysis_payload.get("role_family", "")
+    )
     compact_core = {
         "updated_title": str(core_payload.get("updated_title", "")).strip(),
         "updated_summary": str(core_payload.get("updated_summary", "")).strip(),
@@ -2370,7 +3069,7 @@ def generate_experience_subset_from_analysis(
         api_key=api_key,
         model=model,
         temperature=RESUME_TEMPERATURE,
-        developer_prompt=build_ai_resume_experience_subset_prompt(blueprints),
+        developer_prompt=build_ai_resume_experience_subset_prompt(blueprints, prompt_family_key),
         user_prompt="\n\n".join(user_parts),
         schema_name="resume_experience_subset_generation",
         schema=ai_experience_subset_schema(blueprints),
@@ -3100,7 +3799,7 @@ def generate_ai_title_summary():
         timing = {"title_summary_ms": int((time.perf_counter() - started) * 1000)}
         timing["total_ms"] = timing["title_summary_ms"]
 
-        issues = validate_title_summary_payload(title_summary)
+        issues = validate_title_summary_payload(title_summary, analysis_payload)
         if issues:
             raise AIStageError("title_summary_generation", "Title and summary generation failed validation: " + " | ".join(issues[:3]), analysis=analysis_payload, timing=timing)
 
@@ -3109,6 +3808,7 @@ def generate_ai_title_summary():
         session["experience_older"] = None
         if session.get("skills"):
             session["core_resume"] = merge_core_sections(title_summary, session["skills"])
+            session["core_resume"]["_analysis"] = analysis_payload
         session["updated_at"] = time.time()
         return jsonify({
             "success": True,
@@ -3154,6 +3854,7 @@ def generate_ai_skills():
         session["experience_older"] = None
         if session.get("title_summary"):
             session["core_resume"] = merge_core_sections(session["title_summary"], skills_payload)
+            session["core_resume"]["_analysis"] = analysis_payload
         session["updated_at"] = time.time()
         return jsonify({
             "success": True,
@@ -3208,7 +3909,7 @@ def review_ai_core():
             ordered_categories,
         )
 
-        summary_issues = validate_title_summary_payload(corrected_title_summary, summary_max_buffer=10)
+        summary_issues = validate_title_summary_payload(corrected_title_summary, analysis_payload, summary_max_buffer=10)
         skills_issues = validate_skills_only_payload(corrected_skills, analysis_payload)
         issues = summary_issues + skills_issues
         if issues:
@@ -3225,16 +3926,19 @@ def review_ai_core():
         session["title_summary"] = corrected_title_summary
         session["skills"] = corrected_skills
         session["core_resume"] = merge_core_sections(session["title_summary"], session["skills"])
+        session["core_resume"]["_analysis"] = analysis_payload
         session["updated_at"] = time.time()
         timing["total_ms"] = timing["core_refinement_ms"]
 
         response_content = format_core_resume_text(session["core_resume"])
         experience_payload = None
+        title_warnings: list[str] = []
         if session.get("experience_recent") and session.get("experience_older"):
             experience_payload = {"experience": {}}
             experience_payload["experience"].update(session["experience_recent"].get("experience", {}))
             experience_payload["experience"].update(session["experience_older"].get("experience", {}))
             response_content = format_generated_resume_text(merge_resume_payloads(session["core_resume"], experience_payload))
+            title_warnings = collect_experience_title_warnings(experience_payload, analysis_payload)
 
         return jsonify({
             "success": True,
@@ -3242,6 +3946,7 @@ def review_ai_core():
             "revised": revised,
             "core": session["core_resume"],
             "experience": experience_payload,
+            "title_warnings": title_warnings,
             "content": response_content,
             "timing": timing,
         })
@@ -3293,6 +3998,7 @@ def generate_ai_experience():
 
         merged_payload = merge_resume_payloads(core_payload, experience_payload)
         resume_text = format_generated_resume_text(merged_payload)
+        title_warnings = collect_experience_title_warnings(experience_payload, analysis_payload)
 
         turn = {
             "revision_request": revision_request,
@@ -3310,6 +4016,7 @@ def generate_ai_experience():
             "memory_limit": AI_MEMORY_LIMIT,
             "analysis": analysis_payload,
             "experience": experience_payload,
+            "title_warnings": title_warnings,
             "content": resume_text,
             "model": RESUME_MODEL,
             "timing": timing,
@@ -3359,6 +4066,7 @@ def _generate_ai_experience_subset(*, recent: bool):
             raise AIStageError("core_generation", "Title, summary, and skills are required before experience generation.", analysis=analysis_payload)
 
         core_payload = merge_core_sections(title_summary, skills_payload)
+        core_payload["_analysis"] = analysis_payload
         blueprints = EXPERIENCE_BLUEPRINTS[:2] if recent else EXPERIENCE_BLUEPRINTS[2:]
         model = RESUME_MODEL
         timeout_seconds = OPENAI_RESUME_TIMEOUT_SECONDS
@@ -3376,7 +4084,7 @@ def _generate_ai_experience_subset(*, recent: bool):
         timing = {timing_key: int((time.perf_counter() - started) * 1000)}
         timing["total_ms"] = timing[timing_key]
 
-        issues = validate_experience_subset_payload(subset_payload, blueprints)
+        issues = validate_experience_subset_payload_with_analysis(subset_payload, blueprints, analysis_payload)
         if issues:
             raise AIStageError(
                 "experience_generation",
@@ -3394,6 +4102,7 @@ def _generate_ai_experience_subset(*, recent: bool):
             merged_experience["experience"].update(session["experience_older"].get("experience", {}))
             merged_payload = merge_resume_payloads(core_payload, merged_experience)
             resume_text = format_generated_resume_text(merged_payload)
+            title_warnings = collect_experience_title_warnings(merged_experience, analysis_payload)
             turn = {
                 "revision_request": "",
                 "analysis": analysis_payload,
@@ -3407,6 +4116,7 @@ def _generate_ai_experience_subset(*, recent: bool):
                 "session_id": session_id,
                 "content": resume_text,
                 "experience": merged_experience,
+                "title_warnings": title_warnings,
                 "timing": timing,
                 "complete": True,
             })

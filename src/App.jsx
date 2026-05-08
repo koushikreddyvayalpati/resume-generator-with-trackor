@@ -494,15 +494,18 @@ export default function App() {
   }
 
   function soulThreadEntry(analysis) {
+    const keySignals = (analysis.skills_mentioned || []).slice(0, 6);
+    const highlights = (analysis.responsibilities || []).slice(0, 3);
     return {
       kind: "assistant",
       title: analysis.target_role || "Role summary",
       lines: [
+        `Role family: ${analysis.role_family || ""}`,
         `Soul of the role: ${analysis.core_problem || ""}`,
         `System focus: ${analysis.system_description || ""}`,
-        `Key signals: ${(analysis.core_skills || []).slice(0, 6).join(", ")}`,
+        `Key signals: ${keySignals.join(", ")}`,
       ],
-      list: (analysis.build_strategy || []).slice(0, 3),
+      list: highlights,
     };
   }
 
@@ -629,18 +632,29 @@ export default function App() {
       setShowGeneratedArea(true);
       setComposerInput("");
       setTab("parsed");
-      setAiThread((current) => [
-        ...current,
-        {
-          kind: "assistant",
-          title: reviewedCoreData.revised ? "Resume Refined" : "Resume Complete",
-          lines: [
-            reviewedCoreData.revised
-              ? "The full resume is ready, and the summary and technical skills were tightened after experience generation."
-              : "Complete resume is generated. You can edit it directly in the parsed preview.",
-          ],
-        },
-      ]);
+      setAiThread((current) => {
+        const next = [
+          ...current,
+          {
+            kind: "assistant",
+            title: reviewedCoreData.revised ? "Resume Refined" : "Resume Complete",
+            lines: [
+              reviewedCoreData.revised
+                ? "The full resume is ready, and the summary and technical skills were tightened after experience generation."
+                : "Complete resume is generated. You can edit it directly in the parsed preview.",
+            ],
+          },
+        ];
+        if (reviewedCoreData.title_warnings?.length) {
+          next.push({
+            kind: "assistant",
+            title: "Experience Titles Adjusted",
+            lines: ["A few historical job titles were normalized to fit the detected role family."],
+            list: reviewedCoreData.title_warnings,
+          });
+        }
+        return next;
+      });
     } catch (error) {
       const payload = error.data || {};
       if (payload.analysis) {
