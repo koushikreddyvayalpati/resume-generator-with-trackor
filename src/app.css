@@ -35,7 +35,7 @@ body {
   color: var(--text);
 }
 
-button, input, textarea {
+button, input, textarea, select {
   font: inherit;
 }
 
@@ -192,7 +192,8 @@ button, input, textarea {
 }
 
 input,
-textarea {
+textarea,
+select {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -207,7 +208,8 @@ textarea::placeholder {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: rgba(255, 255, 255, 0.18);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
 }
@@ -1017,9 +1019,181 @@ textarea:focus {
   margin-top: auto;
 }
 
+.tracker-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tracker-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.tracker-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tracker-search {
+  min-height: 42px;
+}
+
+.tracker-date-filters {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tracker-view-toggle {
+  max-width: 220px;
+}
+
+.tracker-form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tracker-lock-note {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.tracker-board {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.tracker-column {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;
+  padding: 12px;
+}
+
+.tracker-column-header {
+  align-items: center;
+  display: flex;
+  font-size: 0.92rem;
+  font-weight: 700;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.tracker-card-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tracker-card {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+}
+
+.tracker-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tracker-card-company {
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.tracker-card-role {
+  color: #d4d4d4;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.tracker-card-meta {
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  gap: 4px;
+}
+
+.tracker-card-actions select {
+  min-height: 38px;
+  width: 100%;
+}
+
+.tracker-empty-column,
+.tracker-empty-row {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 24px 8px;
+  text-align: center;
+}
+
+.tracker-table-shell {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: auto;
+}
+
+.tracker-table {
+  border-collapse: collapse;
+  min-width: 100%;
+  width: 100%;
+}
+
+.tracker-table th,
+.tracker-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.tracker-table th {
+  background: var(--panel-2);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tracker-table td {
+  font-size: 0.88rem;
+}
+
+.tracker-table-company {
+  font-weight: 700;
+}
+
+.tracker-table-subtle {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+
 @media (max-width: 1200px) {
   .workspace {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .tracker-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1069,6 +1243,15 @@ textarea:focus {
   }
 
   .profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-form-grid,
+  .tracker-board {
+    grid-template-columns: 1fr;
+  }
+
+  .tracker-date-filters {
     grid-template-columns: 1fr;
   }
 }

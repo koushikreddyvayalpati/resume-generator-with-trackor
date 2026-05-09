@@ -45,6 +45,7 @@ BASE_RESUME_PATH = resource_path("config", "base_resume.json")
 DEFAULT_OUTPUT_ROOT = str(default_output_dir())
 OUTPUT_ROOT = os.getenv("OUTPUT_ROOT", DEFAULT_OUTPUT_ROOT)
 SETTINGS_FILE = settings_path()
+TRACKER_FILE = resource_path("config", "application_tracker.json")
 
 def load_settings():
     """Load settings from config/settings.json, fall back to env var if missing."""
@@ -59,6 +60,8 @@ def save_settings(settings_dict):
     write_json_file(Path(SETTINGS_FILE), settings_dict)
 
 settings = load_settings()
+
+TRACKER_STATUSES = ["Applied", "Updated", "Converted", "Ghosted", "Rejected"]
 
 ANALYSIS_MODEL = os.getenv("OPENAI_ANALYSIS_MODEL", "gpt-4o-mini")
 RESUME_MODEL = os.getenv("OPENAI_RESUME_MODEL", "gpt-5-mini")
@@ -297,6 +300,9 @@ PREFERRED_SKILL_CATEGORY_ORDER = [
 ROLE_FAMILY_TO_SKILL_ORDER_KEY = {
     "full-stack product engineering": "fullstack_product",
     "backend application engineering": "backend_application",
+    "integration engineering": "backend_application",
+    "application integration engineering": "backend_application",
+    "cloud integration engineering": "backend_application",
     "data engineering": "data_engineering",
     "analytics engineering": "data_engineering",
     "platform engineering": "platform_distributed",
@@ -343,6 +349,9 @@ ROLE_FAMILY_TO_SKILL_ORDER_KEY = {
 ROLE_FAMILY_TO_PROMPT_FAMILY_KEY = {
     "full-stack product engineering": "software_engineering",
     "backend application engineering": "software_engineering",
+    "integration engineering": "software_engineering",
+    "application integration engineering": "software_engineering",
+    "cloud integration engineering": "software_engineering",
     "data engineering": "data_engineering",
     "analytics engineering": "data_engineering",
     "platform engineering": "platform_systems",
@@ -490,6 +499,291 @@ FORBIDDEN_TERMS_BY_COMPANY = {
 ai_sessions: dict[str, dict] = {}
 _whisper_model = None
 _whisper_error = None
+
+
+def load_tracker_store() -> dict:
+    store = load_json_file(Path(TRACKER_FILE), {"applications": []})
+    applications = store.get("applications")
+    if not isinstance(applications, list):
+        applications = []
+    store["applications"] = applications
+    return store
+
+
+def save_tracker_store(store: dict) -> None:
+    write_json_file(Path(TRACKER_FILE), {"applications": store.get("applications", [])})
+
+
+def today_iso_date() -> str:
+    return datetime.now().date().isoformat()
+
+
+def normalize_tracker_status(status: str) -> str:
+    value = str(status or "").strip().title()
+    return value if value in TRACKER_STATUSES else "Applied"
+
+
+def parse_iso_date(value: str) -> datetime:
+    try:
+        return datetime.fromisoformat(str(value).strip())
+    except Exception:
+        return datetime.min
+
+
+def iso_from_timestamp(timestamp: float) -> str:
+    return datetime.fromtimestamp(timestamp).isoformat(timespec="seconds")
+
+
+def file_created_iso(path: Path) -> str:
+    stat = path.stat()
+    created_ts = getattr(stat, "st_birthtime", None) or stat.st_mtime
+    return iso_from_timestamp(created_ts)
+
+
+def parse_resume_snapshot(content: str, contact_override: dict | None = None, identity: str = "outlook") -> dict:
+    base_resume = load_base_resume()
+    merged_resume = parse_updated_content_to_resume(str(content or "").strip(), base_resume)
+    merged_resume = apply_profile_overrides(merged_resume)
+    if isinstance(contact_override, dict):
+        merged_resume["contact"] = {
+            **merged_resume.get("contact", {}),
+            **{
+                key: str(contact_override.get(key, "")).strip()
+                for key in ("location", "phone", "email")
+                if str(contact_override.get(key, "")).strip()
+            },
+        }
+    return merged_resume
+
+
+def build_tracker_application_record(
+    *,
+    company_name: str,
+    job_description: str,
+    resume_content: str,
+    analysis_payload: dict | None,
+    applied_date: str,
+    status: str,
+    source: str = "",
+    job_url: str = "",
+    notes: str = "",
+    pdf_path: str = "",
+    output_dir: str = "",
+    contact_override: dict | None = None,
+    identity: str = "outlook",
+) -> dict:
+    parsed_resume = parse_resume_snapshot(resume_content, contact_override, identity)
+    normalized_status = normalize_tracker_status(status)
+    company = str(company_name or "").strip() or str((analysis_payload or {}).get("company_name", "")).strip() or "Unknown Company"
+    role_title = str(parsed_resume.get("title", "")).strip() or str((analysis_payload or {}).get("target_role", "")).strip() or "Untitled Role"
+    now_iso = datetime.now().isoformat(timespec="seconds")
+    effective_applied_date = str(applied_date or "").strip() or today_iso_date()
+    initial_event = {
+        "status": normalized_status,
+        "changed_at": now_iso,
+        "effective_date": effective_applied_date,
+        "note": str(notes or "").strip(),
+    }
+    return {
+        "id": uuid.uuid4().hex,
+        "company_name": company,
+        "role_title": role_title,
+        "role_family": str((analysis_payload or {}).get("role_family", "")).strip(),
+        "target_role": str((analysis_payload or {}).get("target_role", "")).strip(),
+        "status": normalized_status,
+        "applied_date": effective_applied_date,
+        "last_updated_date": now_iso,
+        "status_updated_date": effective_applied_date,
+        "source": str(source or "").strip(),
+        "job_url": str(job_url or "").strip(),
+        "notes": str(notes or "").strip(),
+        "pdf_path": str(pdf_path or "").strip(),
+        "output_dir": str(output_dir or "").strip(),
+        "resume_content": str(resume_content or "").strip(),
+        "resume_snapshot": parsed_resume,
+        "job_description": str(job_description or "").strip(),
+        "analysis": compact_analysis_for_generation(analysis_payload or {}),
+        "history": [initial_event],
+        "created_at": now_iso,
+        "locked": True,
+    }
+
+
+def infer_application_from_output_dir(folder: Path) -> dict | None:
+    if not folder.is_dir():
+        return None
+
+    docx_path = folder / "tharun manikonda resume.docx"
+    pdf_path = folder / "tharun manikonda resume.pdf"
+    status_path = folder / "pdf_status.json"
+    artifact_path = docx_path if docx_path.exists() else pdf_path if pdf_path.exists() else None
+    if artifact_path is None:
+        return None
+
+    folder_name = folder.name
+    company_name = folder_name
+    role_title = "Locked Resume"
+    if " - " in folder_name:
+        parts = [part.strip() for part in folder_name.split(" - ") if part.strip()]
+        if len(parts) >= 2:
+            company_name = parts[0]
+            role_title = " - ".join(parts[1:])
+
+    created_iso = file_created_iso(artifact_path)
+    application_id = "fs-" + uuid.uuid5(uuid.NAMESPACE_URL, str(folder.resolve())).hex
+    return {
+        "id": application_id,
+        "company_name": company_name,
+        "role_title": role_title,
+        "role_family": "",
+        "target_role": role_title,
+        "status": "Applied",
+        "applied_date": created_iso[:10],
+        "last_updated_date": created_iso,
+        "status_updated_date": created_iso[:10],
+        "source": "",
+        "job_url": "",
+        "notes": "",
+        "pdf_path": str(pdf_path) if pdf_path.exists() else "",
+        "output_dir": str(folder),
+        "resume_content": "",
+        "resume_snapshot": {"title": role_title},
+        "job_description": "",
+        "analysis": {},
+        "history": [
+            {
+                "status": "Applied",
+                "changed_at": created_iso,
+                "effective_date": created_iso[:10],
+                "note": "Imported from saved resume folder",
+            }
+        ],
+        "created_at": created_iso,
+        "locked": True,
+        "discovered": True,
+        "status_path": str(status_path) if status_path.exists() else "",
+    }
+
+
+def scan_output_tracker_applications() -> list[dict]:
+    output_root = Path(settings["output_directory"]).expanduser().resolve()
+    if not output_root.exists():
+        return []
+
+    discovered: list[dict] = []
+    if output_root.is_dir():
+        seen_dirs: set[str] = set()
+        candidate_files = sorted(
+            [
+                path for path in output_root.rglob("*")
+                if path.is_file() and path.suffix.lower() in {".docx", ".pdf"}
+            ],
+            key=lambda path: str(path).lower(),
+        )
+
+        for path in candidate_files:
+            if path.name.lower() in {"tharun manikonda resume.docx", "tharun manikonda resume.pdf"} and path.parent != output_root:
+                parent_key = str(path.parent.resolve())
+                if parent_key in seen_dirs:
+                    continue
+                item = infer_application_from_output_dir(path.parent)
+                if item:
+                    discovered.append(item)
+                    seen_dirs.add(parent_key)
+                continue
+
+            if path.parent == output_root:
+                created_iso = file_created_iso(path)
+                application_id = "fs-" + uuid.uuid5(uuid.NAMESPACE_URL, str(path.resolve())).hex
+                discovered.append({
+                    "id": application_id,
+                    "company_name": path.stem,
+                    "role_title": "Locked Resume",
+                    "role_family": "",
+                    "target_role": "Locked Resume",
+                    "status": "Applied",
+                    "applied_date": created_iso[:10],
+                    "last_updated_date": created_iso,
+                    "status_updated_date": created_iso[:10],
+                    "source": "",
+                    "job_url": "",
+                    "notes": "",
+                    "pdf_path": str(path) if path.suffix.lower() == ".pdf" else "",
+                    "output_dir": str(path.parent),
+                    "resume_content": "",
+                    "resume_snapshot": {"title": path.stem},
+                    "job_description": "",
+                    "analysis": {},
+                    "history": [
+                        {
+                            "status": "Applied",
+                            "changed_at": created_iso,
+                            "effective_date": created_iso[:10],
+                            "note": "Imported from saved resume file",
+                        }
+                    ],
+                    "created_at": created_iso,
+                    "locked": True,
+                    "discovered": True,
+                    "status_path": "",
+                })
+    return discovered
+
+
+def merge_tracker_applications(store: dict) -> list[dict]:
+    persisted = list(store.get("applications", []))
+    discovered = scan_output_tracker_applications()
+    persisted_by_output = {
+        str(item.get("output_dir", "")).strip(): item
+        for item in persisted
+        if str(item.get("output_dir", "")).strip()
+    }
+
+    merged: list[dict] = []
+    seen_ids: set[str] = set()
+
+    for discovered_item in discovered:
+        match = persisted_by_output.get(str(discovered_item.get("output_dir", "")).strip())
+        if match:
+            merged_item = {
+                **discovered_item,
+                **match,
+                "discovered": True,
+                "locked": True,
+            }
+        else:
+            merged_item = discovered_item
+        merged.append(merged_item)
+        seen_ids.add(str(merged_item.get("id", "")))
+
+    for item in persisted:
+        item_id = str(item.get("id", ""))
+        if item_id not in seen_ids:
+            merged.append(item)
+
+    return merged
+
+
+def summarize_tracker(store: dict) -> dict:
+    applications = store.get("applications", [])
+    counts = {status: 0 for status in TRACKER_STATUSES}
+    for app_record in applications:
+        counts[normalize_tracker_status(app_record.get("status", ""))] += 1
+    return {
+        "counts": counts,
+        "total": len(applications),
+    }
+
+
+def sorted_tracker_applications(applications: list[dict], *, sort_key: str = "applied_date", descending: bool = True) -> list[dict]:
+    def key_fn(item: dict):
+        if sort_key == "last_updated_date":
+            return parse_iso_date(item.get("last_updated_date", ""))
+        if sort_key == "status":
+            return normalize_tracker_status(item.get("status", ""))
+        return parse_iso_date(item.get("applied_date", ""))
+
+    return sorted(applications, key=key_fn, reverse=descending)
 
 
 class AIStageError(RuntimeError):
@@ -659,6 +953,53 @@ def compact_analysis_for_reachout(analysis_payload: dict) -> dict:
     }
 
 
+def normalize_analysis_payload(analysis_payload: dict) -> dict:
+    normalized = dict(analysis_payload or {})
+    role_family = str(normalized.get("role_family", "")).strip()
+    role_family_lower = role_family.lower()
+    target_role = str(normalized.get("target_role", "")).strip().lower()
+    skills_mentioned = [str(item).strip().lower() for item in (normalized.get("skills_mentioned") or []) if str(item).strip()]
+    responsibilities = [str(item).strip().lower() for item in (normalized.get("responsibilities") or []) if str(item).strip()]
+    combined_signals = " ".join([role_family_lower, target_role, *skills_mentioned, *responsibilities])
+
+    customer_facing_markers = (
+        "demo", "onboarding", "customer support", "adoption", "pre-sales", "presales",
+        "sales engineering", "technical account", "implementation for customers", "customer-facing"
+    )
+    backend_integration_markers = (
+        "azure", ".net", "rest", "restful", "api", "microservice", "service bus", "oauth", "jwt",
+        "azure ad", "docker", "kubernetes", "ci/cd", "devops", "azure devops", "functions", "app service",
+        "container apps", "event-driven", "event driven", "web services"
+    )
+
+    looks_customer_facing = any(marker in combined_signals for marker in customer_facing_markers)
+    looks_backend_integration = any(marker in combined_signals for marker in backend_integration_markers)
+
+    if (
+        normalized.get("prompt_family_key") == "solutions_customer"
+        and "integration" in combined_signals
+        and looks_backend_integration
+        and not looks_customer_facing
+    ):
+        normalized["role_family"] = "backend application engineering"
+        normalized["prompt_family_key"] = "software_engineering"
+        normalized["skill_category_order_key"] = "backend_application"
+    elif (
+        "integration" in role_family_lower
+        and looks_backend_integration
+        and not looks_customer_facing
+    ):
+        normalized["role_family"] = "backend application engineering"
+        normalized["prompt_family_key"] = "software_engineering"
+        normalized["skill_category_order_key"] = "backend_application"
+
+    if not str(normalized.get("skill_category_order_key", "")).strip():
+        normalized["skill_category_order_key"] = infer_skill_category_order_key(normalized.get("role_family", ""))
+    if not str(normalized.get("prompt_family_key", "")).strip():
+        normalized["prompt_family_key"] = infer_prompt_family_key(normalized.get("role_family", ""))
+    return normalized
+
+
 def extract_reachout_resume_snapshot(current_resume_content: str) -> dict:
     text = str(current_resume_content or "").strip()
     title = ""
@@ -780,6 +1121,8 @@ def infer_skill_category_order_key(role_family: str) -> str:
     for known_family, key in ROLE_FAMILY_TO_SKILL_ORDER_KEY.items():
         if known_family in family:
             return key
+    if "integration" in family and not any(term in family for term in ("solution", "implementation", "customer", "pre-sales", "presales")):
+        return "backend_application"
     if "gtm" in family or "go-to-market" in family or "go to market" in family or "revops" in family or "revenue engineering" in family:
         return "gtm_engineering"
     if "data" in family or "analytics" in family:
@@ -812,6 +1155,8 @@ def infer_prompt_family_key(role_family: str) -> str:
     for known_family, key in ROLE_FAMILY_TO_PROMPT_FAMILY_KEY.items():
         if known_family in family:
             return key
+    if "integration" in family and not any(term in family for term in ("solution", "implementation", "customer", "pre-sales", "presales")):
+        return "software_engineering"
     if "gtm" in family or "go-to-market" in family or "go to market" in family or "revops" in family or "revenue engineering" in family:
         return "gtm_engineering"
     if "marketing analyst" in family:
@@ -863,6 +1208,8 @@ def build_ai_analysis_prompt() -> str:
             "If the JD centers on SQL, PySpark, Snowflake, ETL, orchestration, dashboards, or data quality, classify it as data engineering or analytics engineering rather than generic software engineering.",
             "If the JD centers on Rust, Linux, concurrency, networking, security platforms, or low-level services, classify it as platform engineering or distributed systems engineering rather than generic full-stack work.",
             "If the JD centers on reporting, dashboards, SQL analysis, business insights, stakeholder support, campaign measurement, attribution, funnel metrics, requirements gathering, or KPI analysis, classify it as an analyst family rather than software engineering.",
+            "If the JD is about building internal or product-side integrations across APIs, cloud services, microservices, authentication, event-driven systems, CI/CD, DevOps, or backend services, classify it as backend application engineering or cloud integration engineering rather than solutions engineering.",
+            "Reserve solutions engineering and implementation engineering for clearly customer-facing roles such as demos, onboarding, external implementations, technical account support, pre-sales, sales engineering, or customer adoption work.",
             "If the JD centers on CRM systems, revops, lead routing, enrichment, outbound tooling, lifecycle automation, sequencing, GTM workflows, pipeline reporting, or sales/marketing system automation, classify it as GTM engineering rather than software engineering or generic analyst work.",
             "If the JD mentions Excel, Power BI, Tableau, Looker, Jira, Confluence, Salesforce, SAP, Oracle, Workday, PeopleSoft, Banner, WMS, Manhattan SCALE, Manhattan Active, Blue Yonder, ERP, SCM, or CRM platforms, preserve those as important analyst or systems signals rather than treating them like minor supporting tools.",
             "If the JD mentions Clay, Salesforce, HubSpot, Outreach, Apollo, Marketo, 6sense, Gong, Customer.io, ZoomInfo, Smartlead, Instantly, HeyReach, Nooks, Warmly, lead routing, enrichment, outbound sequencing, or GTM automation, preserve those as important GTM systems and workflow signals.",
@@ -1189,18 +1536,21 @@ def build_ai_resume_title_summary_prompt(prompt_family_key: str = "software_engi
             "- mention tools and workflows that support insight generation, experimentation, and communication",
             "- preserve analyst stack terms like Excel, Power BI, Tableau, Looker, and domain systems when the JD mentions them",
             "- if the JD does not explicitly mention a named analyst tool or platform, use generic analyst workflow language instead of inventing one",
+            "- if the JD does not mention named tools, prefer phrases like reporting workflows, dashboarding, requirements support, data analysis, or stakeholder communication instead of vendor names",
         ],
         "analyst_business": [
             "- emphasize requirements, process analysis, KPI reporting, stakeholder communication, and turning findings into execution plans",
             "- frame the role around business workflows, analysis, and cross-functional clarity rather than engineering implementation",
             "- preserve business-system and operations tools like Excel, Jira, Confluence, ERP, WMS, CRM, SAP, Oracle, Workday, PeopleSoft, Banner, Manhattan, and Blue Yonder when they are mentioned",
             "- if the JD does not explicitly mention a named enterprise platform, use generic analyst and process language instead of inventing one",
+            "- if the JD does not mention named tools, prefer phrases like requirements documentation, business readiness, testing support, product backlog support, KPI monitoring, or stakeholder engagement instead of vendor names",
         ],
         "analyst_marketing": [
             "- emphasize campaign analysis, attribution, funnel metrics, experimentation, and marketing reporting",
             "- frame the role around growth insights, customer behavior analysis, and cross-functional communication rather than engineering delivery",
             "- preserve marketing analytics and reporting tools like Excel, BI platforms, CRM systems, and attribution-oriented tooling when the JD mentions them",
             "- if the JD does not explicitly mention a named marketing or CRM platform, use generic analytics language instead of inventing one",
+            "- if the JD does not mention named tools, prefer phrases like campaign reporting, funnel analysis, segmentation, lifecycle measurement, or stakeholder insights instead of vendor names",
         ],
         "gtm_engineering": [
             "- emphasize GTM automation, CRM and revops workflows, routing, enrichment, outbound systems, reporting, and cross-functional execution",
@@ -1266,6 +1616,7 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
             "- preserve Excel, Power BI, Tableau, Looker, Python, R, and domain reporting systems prominently when the JD mentions them",
             "- if the JD does not explicitly mention a named analyst tool, do not invent one; use strong generic analyst capabilities instead",
             "- for analyst roles, keep process, reporting, stakeholder, and KPI terms in the analyst categories instead of forcing them into engineering categories",
+            "- if the category is Tools & Platforms and the JD does not mention named tools, use generic items like reporting platforms, documentation systems, workflow tools, testing tools, or business systems instead of vendor names",
         ],
         "analyst_business": [
             "- prioritize business analysis, reporting, requirements, process improvement, KPI tracking, and stakeholder communication terms",
@@ -1273,6 +1624,7 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
             "- preserve Excel, BI tools, Jira, Confluence, ERP, WMS, CRM, SAP, Oracle, Workday, PeopleSoft, Banner, Manhattan, and Blue Yonder terms prominently when the JD mentions them",
             "- if the JD does not explicitly mention a named enterprise platform, do not invent one; use generic business-analysis capabilities instead",
             "- keep budget tracking, risk management, traceability, UAT, and stakeholder work inside analyst-oriented categories rather than engineering categories",
+            "- if the category is Tools & Platforms and the JD does not mention named tools, use generic items like documentation systems, workflow tools, product support systems, testing tools, or business systems instead of vendor names",
         ],
         "analyst_marketing": [
             "- prioritize campaign analysis, attribution, funnel metrics, experimentation, segmentation, dashboards, and reporting terms",
@@ -1280,6 +1632,7 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
             "- preserve Excel, BI tools, CRM tools, Salesforce, and attribution or lifecycle measurement terms prominently when the JD mentions them",
             "- if the JD does not explicitly mention a named marketing platform, do not invent one; use generic marketing-analytics capabilities instead",
             "- keep campaign metrics, segmentation, reporting, and stakeholder insights inside analyst-oriented categories rather than engineering categories",
+            "- if the category is Tools & Platforms and the JD does not mention named tools, use generic items like analytics platforms, reporting tools, CRM systems, or lifecycle tools instead of vendor names",
         ],
         "gtm_engineering": [
             "- prioritize CRM workflows, GTM automation, routing, enrichment, outbound systems, pipeline reporting, and revops terms",
@@ -1316,6 +1669,7 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
             "- skip a category only if it is truly irrelevant; otherwise fill it with 2-5 strong items",
             "- each item must read like a real resume skill, not a broken fragment or half sentence",
             "- if an item looks truncated, awkward, or too descriptive, rewrite it into a clean recruiter-scan term",
+            "- for analyst families, prefer JD-grounded tools first; if the JD does not name tools, use generic capability labels instead of common vendor names",
             *selected_rules,
             "- expected style:",
             "  - Programming Languages: TypeScript, JavaScript, Python",
@@ -1387,6 +1741,9 @@ def build_ai_resume_experience_prompt(prompt_family_key: str = "software_enginee
             "EXPERIENCE RULES:",
             "- Follow the fixed company, location, and date structure exactly",
             "- The title field must contain only the role title",
+            "- Never put company name, location, dates, or separators into the title field",
+            "- Invalid title example: 'McKinsey & Company | CA, USA | May 2025 – Present'",
+            "- Valid title example: 'Integration Engineer'",
             "- Preserve natural title phrasing",
             "- Do not rewrite historical titles to imitate the target role family",
             "- Bullet count per company must match exactly",
@@ -1492,6 +1849,10 @@ def build_ai_resume_experience_subset_prompt(blueprints: list[dict], prompt_fami
             "RULES:",
             "- follow the fixed company, location, and date structure exactly",
             "- keep historical titles believable",
+            "- the title field must contain only the role title",
+            "- never put company name, location, dates, or separators into the title field",
+            "- invalid title example: 'McKinsey & Company | CA, USA | May 2025 – Present'",
+            "- valid title example: 'Integration Engineer'",
             "- do not rewrite titles to imitate the target role",
             "- recent roles should sell harder than older roles",
             "- each bullet must be 25-30 words",
@@ -1913,9 +2274,9 @@ def ai_core_correction_schema(allowed_skill_categories: list[str] | None = None)
 
 DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY = {
     "software_engineering": {
-        "mckinsey": "Applied AI Engineer / Full Stack Developer",
-        "uber": "Full Stack Developer",
-        "kpmg": "Java Full Stack Developer",
+        "mckinsey": "Software Engineer",
+        "uber": "Software Engineer",
+        "kpmg": "Software Engineer",
         "trigent": "Frontend Developer",
     },
     "data_engineering": {
@@ -1962,6 +2323,13 @@ DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY = {
     },
 }
 
+INTEGRATION_ROLE_FAMILY_DEFAULT_TITLES = {
+    "mckinsey": "Integration Engineer",
+    "uber": "Software Engineer",
+    "kpmg": "Software Engineer",
+    "trigent": "Frontend Developer",
+}
+
 ENGINEERING_TITLE_MARKERS = {
     "engineer",
     "developer",
@@ -1983,12 +2351,60 @@ def default_role_title_for_prompt_family(blueprint_key: str, prompt_family_key: 
     )
 
 
-def resolve_experience_title(raw_title: str, blueprint: dict, analysis_payload: dict | None = None) -> tuple[str, str | None]:
+def default_role_title_for_analysis(blueprint_key: str, analysis_payload: dict | None = None) -> str:
     prompt_family_key = infer_prompt_family_key((analysis_payload or {}).get("role_family", ""))
-    fallback_title = default_role_title_for_prompt_family(blueprint["key"], prompt_family_key)
+    role_family = str((analysis_payload or {}).get("role_family", "")).strip().lower()
+    target_role = str((analysis_payload or {}).get("target_role", "")).strip().lower()
+    combined = f"{role_family} {target_role}"
+    if "integration" in combined and prompt_family_key == "software_engineering":
+        return INTEGRATION_ROLE_FAMILY_DEFAULT_TITLES.get(blueprint_key, "Software Engineer")
+    return default_role_title_for_prompt_family(blueprint_key, prompt_family_key)
+
+
+def invalid_experience_title_reason(raw_title: str, blueprint: dict) -> str | None:
     title = (raw_title or "").strip()
     if not title:
-        return fallback_title, f"{blueprint['company']}: missing experience title; rendered as '{fallback_title}'."
+        return "missing title"
+
+    cleaned = title.replace("\n", " ").strip()
+    cleaned = re.sub(r"\s*\|\s*", " | ", cleaned)
+    for fragment in (blueprint["company"], blueprint["location"], blueprint["dates"]):
+        cleaned = cleaned.replace(fragment, "")
+    cleaned = re.sub(r"(?:\s*\|\s*){2,}", " | ", cleaned)
+    cleaned = re.sub(r"^\s*\|\s*", "", cleaned)
+    cleaned = re.sub(r"\s*\|\s*$", "", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" |")
+
+    if not cleaned or cleaned in {blueprint["company"], blueprint["location"], blueprint["dates"]}:
+        return "metadata echo"
+    return None
+
+
+def collect_invalid_experience_titles(experience_payload: dict, blueprints: list[dict]) -> list[dict]:
+    failures: list[dict] = []
+    experience = experience_payload.get("experience") or {}
+    for blueprint in blueprints:
+        entry = experience.get(blueprint["key"]) or {}
+        raw_title = str(entry.get("title", "")).strip()
+        reason = invalid_experience_title_reason(raw_title, blueprint)
+        if reason:
+            failures.append(
+                {
+                    "company": blueprint["company"],
+                    "raw_title": raw_title,
+                    "reason": reason,
+                }
+            )
+    return failures
+
+
+def resolve_experience_title(raw_title: str, blueprint: dict, analysis_payload: dict | None = None) -> tuple[str, str | None]:
+    prompt_family_key = infer_prompt_family_key((analysis_payload or {}).get("role_family", ""))
+    fallback_title = default_role_title_for_analysis(blueprint["key"], analysis_payload)
+    title = (raw_title or "").strip()
+    invalid_reason = invalid_experience_title_reason(title, blueprint)
+    if invalid_reason == "missing title":
+        return fallback_title, f"{blueprint['company']}: model returned an empty title field, so fallback title '{fallback_title}' was applied."
 
     cleaned = title.replace("\n", " ").strip()
     cleaned = re.sub(r"\s*\|\s*", " | ", cleaned)
@@ -2003,8 +2419,11 @@ def resolve_experience_title(raw_title: str, blueprint: dict, analysis_payload: 
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" |")
 
     # If the title is still effectively empty or just looks like metadata, fall back.
-    if not cleaned or cleaned in {blueprint["company"], blueprint["location"], blueprint["dates"]}:
-        return fallback_title, f"{blueprint['company']}: invalid experience title '{title}' replaced with '{fallback_title}'."
+    if invalid_reason == "metadata echo":
+        return fallback_title, (
+            f"{blueprint['company']}: model returned metadata instead of a role title -> '{title}'. "
+            f"After removing company/location/date nothing valid remained, so fallback title '{fallback_title}' was applied."
+        )
 
     # If the model stuffed a whole line with separators, keep only the first non-metadata segment.
     if "|" in cleaned:
@@ -2015,9 +2434,15 @@ def resolve_experience_title(raw_title: str, blueprint: dict, analysis_payload: 
 
     normalized_cleaned = cleaned.lower()
     if prompt_family_key.startswith("analyst_") and any(marker in normalized_cleaned for marker in ENGINEERING_TITLE_MARKERS):
-        return fallback_title, f"{blueprint['company']}: adjusted experience title '{cleaned}' to '{fallback_title}' for analyst-family resume."
+        return fallback_title, (
+            f"{blueprint['company']}: model returned title '{cleaned}', but it conflicts with the analyst-family routing. "
+            f"Fallback title '{fallback_title}' was applied."
+        )
     if prompt_family_key == "gtm_engineering" and "gtm engineer" not in normalized_cleaned and any(marker in normalized_cleaned for marker in ENGINEERING_TITLE_MARKERS):
-        return fallback_title, f"{blueprint['company']}: adjusted experience title '{cleaned}' to '{fallback_title}' for GTM-family resume."
+        return fallback_title, (
+            f"{blueprint['company']}: model returned title '{cleaned}', but it conflicts with the GTM-family routing. "
+            f"Fallback title '{fallback_title}' was applied."
+        )
 
     return cleaned or fallback_title, None
 
@@ -2294,10 +2719,6 @@ ANALYST_EXPLICIT_TOOL_TERMS = {
     "workday",
     "peoplesoft",
     "banner",
-    "wms",
-    "crm",
-    "erp",
-    "scm",
     "manhattan scale",
     "manhattan active",
     "blue yonder",
@@ -2319,6 +2740,28 @@ GTM_EXPLICIT_TOOL_TERMS = {
     "heyreach",
     "nooks",
     "warmly",
+}
+
+ANALYST_TOOL_GENERIC_REPLACEMENTS = {
+    "excel": "reporting tools",
+    "power bi": "dashboard tools",
+    "tableau": "dashboard tools",
+    "looker": "reporting platforms",
+    "jira": "workflow tools",
+    "confluence": "documentation systems",
+    "salesforce": "business systems",
+    "sap": "business systems",
+    "oracle": "business systems",
+    "workday": "business systems",
+    "peoplesoft": "business systems",
+    "banner": "business systems",
+    "wms": "warehouse systems",
+    "crm": "customer systems",
+    "erp": "business systems",
+    "scm": "supply chain systems",
+    "manhattan scale": "warehouse systems",
+    "manhattan active": "warehouse systems",
+    "blue yonder": "supply chain systems",
 }
 
 
@@ -2387,6 +2830,26 @@ def analyst_tool_mentions_not_in_jd(text: str, analysis_payload: dict) -> list[s
         if tool in lowered_text and not any(tool in jd_term for jd_term in jd_terms):
             unsupported.append(tool)
     return unsupported
+
+
+def sanitize_unsupported_analyst_tools_in_text(text: str, analysis_payload: dict) -> str:
+    sanitized = text or ""
+    unsupported_tools = analyst_tool_mentions_not_in_jd(sanitized, analysis_payload)
+    for tool in sorted(set(unsupported_tools), key=len, reverse=True):
+        replacement = ANALYST_TOOL_GENERIC_REPLACEMENTS.get(tool, "business systems")
+        sanitized = re.sub(re.escape(tool), replacement, sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r"\s{2,}", " ", sanitized).strip()
+    return sanitized
+
+
+def sanitize_experience_payload_for_prompt_family(experience_payload: dict, analysis_payload: dict) -> dict:
+    if not is_analyst_prompt_family(analysis_payload):
+        return experience_payload
+    experience = experience_payload.get("experience") or {}
+    for entry in experience.values():
+        bullets = [str(bullet).strip() for bullet in entry.get("bullets", []) if str(bullet).strip()]
+        entry["bullets"] = [sanitize_unsupported_analyst_tools_in_text(bullet, analysis_payload) for bullet in bullets]
+    return sanitize_experience_payload_for_prompt_family(experience_payload, analysis_payload)
 
 
 def gtm_tool_not_in_jd(item: str, analysis_payload: dict) -> str | None:
@@ -2700,6 +3163,9 @@ def validate_experience_subset_payload(experience_payload: dict, blueprints: lis
         bullets = [str(bullet).strip() for bullet in entry.get("bullets", []) if str(bullet).strip()]
         if not role_title:
             issues.append(f"{blueprint['company']} is missing a role title.")
+        invalid_reason = invalid_experience_title_reason(role_title, blueprint)
+        if invalid_reason == "metadata echo":
+            issues.append(f"{blueprint['company']} returned metadata instead of a role title: '{role_title}'.")
         if not (blueprint["bullet_min"] <= len(bullets) <= blueprint["bullet_max"]):
             issues.append(f"{blueprint['company']} must have {blueprint['bullet_min']}-{blueprint['bullet_max']} bullets.")
     return issues
@@ -2762,7 +3228,7 @@ def analyze_job_description(
         "Return the full JD intelligence analysis aligned to the required schema.",
     ]
 
-    return call_openai_structured_output(
+    result = call_openai_structured_output(
         api_key=api_key,
         model=ANALYSIS_MODEL,
         temperature=ANALYSIS_TEMPERATURE,
@@ -2774,6 +3240,7 @@ def analyze_job_description(
         request_timeout_seconds=OPENAI_ANALYSIS_TIMEOUT_SECONDS,
         reasoning_effort="low",
     )
+    return normalize_analysis_payload(result)
 
 
 def generate_resume_from_analysis(
@@ -2868,18 +3335,43 @@ def generate_title_summary_from_analysis(
     prompt_family_key = str(analysis_payload.get("prompt_family_key", "")).strip() or infer_prompt_family_key(
         analysis_payload.get("role_family", "")
     )
-    return call_openai_structured_output(
-        api_key=api_key,
-        model=RESUME_MODEL,
-        temperature=RESUME_TEMPERATURE,
-        developer_prompt=build_ai_resume_title_summary_prompt(prompt_family_key),
-        user_prompt="Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
-        schema_name="resume_title_summary_generation",
-        schema=ai_title_summary_schema(),
-        max_output_tokens=with_output_headroom(2200, SMALL_OUTPUT_HEADROOM),
-        request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
-        reasoning_effort="low",
-    )
+    user_parts = [
+        "Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+    ]
+
+    def run_generation(extra_instruction: str = "") -> dict:
+        prompt_parts = list(user_parts)
+        if extra_instruction:
+            prompt_parts.append(extra_instruction)
+        return call_openai_structured_output(
+            api_key=api_key,
+            model=RESUME_MODEL,
+            temperature=RESUME_TEMPERATURE,
+            developer_prompt=build_ai_resume_title_summary_prompt(prompt_family_key),
+            user_prompt="\n\n".join(prompt_parts),
+            schema_name="resume_title_summary_generation",
+            schema=ai_title_summary_schema(),
+            max_output_tokens=with_output_headroom(2200, SMALL_OUTPUT_HEADROOM),
+            request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
+            reasoning_effort="low",
+        )
+
+    title_summary_payload = run_generation()
+    validation_issues = validate_title_summary_payload(title_summary_payload, analysis_payload)
+    unsupported_tool_issues = [
+        issue for issue in validation_issues
+        if "introduces analyst tools not named in the JD" in issue or "introduces GTM tools not named in the JD" in issue
+    ]
+    if unsupported_tool_issues:
+        retry_lines = [
+            "Previous attempt used named tools in the summary that are not supported by the JD.",
+            "Rewrite the summary using JD-grounded tools or generic workflow language.",
+            "If the JD does not mention a named tool, do not introduce one in the summary.",
+            "Fix these exact issues:",
+            *[f"- {issue}" for issue in unsupported_tool_issues],
+        ]
+        title_summary_payload = run_generation("\n".join(retry_lines))
+    return title_summary_payload
 
 
 def generate_skills_from_analysis(
@@ -2895,26 +3387,47 @@ def generate_skills_from_analysis(
         analysis_payload.get("role_family", "")
     )
     ordered_categories = skill_category_order_for_key(order_key)
-    raw_payload = call_openai_structured_output(
-        api_key=api_key,
-        model=ANALYSIS_MODEL,
-        temperature=ANALYSIS_TEMPERATURE,
-        developer_prompt=build_ai_resume_skills_prompt(prompt_family_key),
-        user_prompt="\n\n".join(
-            [
-                "Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
-                f"Skill category order key: {order_key}",
-                "Fill these categories in this exact order:",
-                json.dumps(ordered_categories, ensure_ascii=False),
-            ]
-        ),
-        schema_name="resume_skills_generation",
-        schema=ai_skills_schema(ordered_categories),
-        max_output_tokens=with_output_headroom(2600, MEDIUM_OUTPUT_HEADROOM),
-        request_timeout_seconds=OPENAI_ANALYSIS_TIMEOUT_SECONDS,
-        reasoning_effort="low",
-    )
-    return normalize_skills_for_order(raw_payload, ordered_categories)
+    user_parts = [
+        "Analysis:\n" + json.dumps(compact_analysis, ensure_ascii=False, separators=(",", ":")),
+        f"Skill category order key: {order_key}",
+        "Fill these categories in this exact order:",
+        json.dumps(ordered_categories, ensure_ascii=False),
+    ]
+
+    def run_generation(extra_instruction: str = "") -> dict:
+        prompt_parts = list(user_parts)
+        if extra_instruction:
+            prompt_parts.append(extra_instruction)
+        raw_payload = call_openai_structured_output(
+            api_key=api_key,
+            model=ANALYSIS_MODEL,
+            temperature=ANALYSIS_TEMPERATURE,
+            developer_prompt=build_ai_resume_skills_prompt(prompt_family_key),
+            user_prompt="\n\n".join(prompt_parts),
+            schema_name="resume_skills_generation",
+            schema=ai_skills_schema(ordered_categories),
+            max_output_tokens=with_output_headroom(2600, MEDIUM_OUTPUT_HEADROOM),
+            request_timeout_seconds=OPENAI_ANALYSIS_TIMEOUT_SECONDS,
+            reasoning_effort="low",
+        )
+        return normalize_skills_for_order(raw_payload, ordered_categories)
+
+    skills_payload = run_generation()
+    skill_issues = validate_skills_only_payload(skills_payload, analysis_payload)
+    unsupported_tool_issues = [
+        issue for issue in skill_issues
+        if "introduces analyst tool" in issue or "introduces GTM tool" in issue
+    ]
+    if unsupported_tool_issues:
+        retry_lines = [
+            "Previous attempt used named tools that are not supported by the JD.",
+            "Replace unsupported vendor names with JD-grounded tools or generic capability labels.",
+            "If the JD does not mention a named tool for Tools & Platforms, use generic items instead of vendor names.",
+            "Fix these exact issues:",
+            *[f"- {issue}" for issue in unsupported_tool_issues],
+        ]
+        skills_payload = run_generation("\n".join(retry_lines))
+    return skills_payload
 
 
 def review_core_sections(
@@ -3027,18 +3540,60 @@ def generate_resume_experience_from_analysis(
     if memory_block:
         user_parts.append(f"Previous session memory (maximum two turns):\n{memory_block}")
 
-    return call_openai_structured_output(
-        api_key=api_key,
-        model=RESUME_MODEL,
-        temperature=RESUME_TEMPERATURE,
-        developer_prompt=build_ai_resume_experience_prompt(prompt_family_key),
-        user_prompt="\n\n".join(user_parts),
-        schema_name="resume_experience_generation",
-        schema=ai_experience_schema(),
-        max_output_tokens=with_output_headroom(5600, LARGE_OUTPUT_HEADROOM),
-        request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
-        reasoning_effort="low",
+    def run_generation(extra_instruction: str = "") -> dict:
+        prompt_parts = list(user_parts)
+        if extra_instruction:
+            prompt_parts.append(extra_instruction)
+        return call_openai_structured_output(
+            api_key=api_key,
+            model=RESUME_MODEL,
+            temperature=RESUME_TEMPERATURE,
+            developer_prompt=build_ai_resume_experience_prompt(prompt_family_key),
+            user_prompt="\n\n".join(prompt_parts),
+            schema_name="resume_experience_generation",
+            schema=ai_experience_schema(),
+            max_output_tokens=with_output_headroom(5600, LARGE_OUTPUT_HEADROOM),
+            request_timeout_seconds=OPENAI_RESUME_TIMEOUT_SECONDS,
+            reasoning_effort="low",
+        )
+
+    experience_payload = run_generation()
+    invalid_titles = collect_invalid_experience_titles(experience_payload, EXPERIENCE_BLUEPRINTS)
+    if invalid_titles:
+        retry_lines = [
+            "Previous attempt failed because one or more experience title fields were invalid.",
+            "Return only the role title text for each company.",
+            "Do not repeat company name, location, dates, or metadata separators in the title field.",
+            "Fix these exact title failures:",
+        ]
+        for failure in invalid_titles:
+            raw_title = failure["raw_title"] or "<empty>"
+            retry_lines.append(
+                f"- {failure['company']}: returned '{raw_title}' ({failure['reason']}); replace it with only the job title."
+            )
+        experience_payload = run_generation("\n".join(retry_lines))
+
+    validation_issues = validate_experience_subset_payload_with_analysis(
+        experience_payload,
+        EXPERIENCE_BLUEPRINTS,
+        analysis_payload,
     )
+    unsupported_tool_issues = [
+        issue for issue in validation_issues
+        if "introduces analyst tools not named in the JD" in issue
+        or "introduces GTM tools not named in the JD" in issue
+    ]
+    if unsupported_tool_issues:
+        retry_lines = [
+            "Previous attempt used named tools in experience bullets that are not supported by the JD.",
+            "Rewrite those bullets using JD-grounded tools or generic workflow language.",
+            "If the JD does not mention a named tool, do not introduce one in any bullet.",
+            "Fix these exact issues:",
+            *[f"- {issue}" for issue in unsupported_tool_issues],
+        ]
+        experience_payload = run_generation("\n".join(retry_lines))
+
+    return sanitize_experience_payload_for_prompt_family(experience_payload, analysis_payload)
 
 
 def generate_experience_subset_from_analysis(
@@ -3065,18 +3620,59 @@ def generate_experience_subset_from_analysis(
         "Selected resume core:",
         json.dumps(compact_core, ensure_ascii=False, separators=(",", ":")),
     ]
-    return call_openai_structured_output(
-        api_key=api_key,
-        model=model,
-        temperature=RESUME_TEMPERATURE,
-        developer_prompt=build_ai_resume_experience_subset_prompt(blueprints, prompt_family_key),
-        user_prompt="\n\n".join(user_parts),
-        schema_name="resume_experience_subset_generation",
-        schema=ai_experience_subset_schema(blueprints),
-        max_output_tokens=with_output_headroom(5200 if len(blueprints) > 1 else 2800, LARGE_OUTPUT_HEADROOM if len(blueprints) > 1 else MEDIUM_OUTPUT_HEADROOM),
-        request_timeout_seconds=timeout_seconds,
-        reasoning_effort="low",
+    def run_generation(extra_instruction: str = "") -> dict:
+        prompt_parts = list(user_parts)
+        if extra_instruction:
+            prompt_parts.append(extra_instruction)
+        return call_openai_structured_output(
+            api_key=api_key,
+            model=model,
+            temperature=RESUME_TEMPERATURE,
+            developer_prompt=build_ai_resume_experience_subset_prompt(blueprints, prompt_family_key),
+            user_prompt="\n\n".join(prompt_parts),
+            schema_name="resume_experience_subset_generation",
+            schema=ai_experience_subset_schema(blueprints),
+            max_output_tokens=with_output_headroom(5200 if len(blueprints) > 1 else 2800, LARGE_OUTPUT_HEADROOM if len(blueprints) > 1 else MEDIUM_OUTPUT_HEADROOM),
+            request_timeout_seconds=timeout_seconds,
+            reasoning_effort="low",
+        )
+
+    experience_payload = run_generation()
+    invalid_titles = collect_invalid_experience_titles(experience_payload, blueprints)
+    if invalid_titles:
+        retry_lines = [
+            "Previous attempt failed because one or more experience title fields were invalid.",
+            "Return only the role title text for each company.",
+            "Do not repeat company name, location, dates, or metadata separators in the title field.",
+            "Fix these exact title failures:",
+        ]
+        for failure in invalid_titles:
+            raw_title = failure["raw_title"] or "<empty>"
+            retry_lines.append(
+                f"- {failure['company']}: returned '{raw_title}' ({failure['reason']}); replace it with only the job title."
+            )
+        experience_payload = run_generation("\n".join(retry_lines))
+
+    validation_issues = validate_experience_subset_payload_with_analysis(
+        experience_payload,
+        blueprints,
+        analysis_payload,
     )
+    unsupported_tool_issues = [
+        issue for issue in validation_issues
+        if "introduces analyst tools not named in the JD" in issue
+        or "introduces GTM tools not named in the JD" in issue
+    ]
+    if unsupported_tool_issues:
+        retry_lines = [
+            "Previous attempt used named tools in experience bullets that are not supported by the JD.",
+            "Rewrite those bullets using JD-grounded tools or generic workflow language.",
+            "If the JD does not mention a named tool, do not introduce one in any bullet.",
+            "Fix these exact issues:",
+            *[f"- {issue}" for issue in unsupported_tool_issues],
+        ]
+        experience_payload = run_generation("\n".join(retry_lines))
+    return experience_payload
 
 
 def generate_reachout_message(
@@ -3538,6 +4134,149 @@ def update_profile():
         if e.analysis and 'session' in locals():
             session["analysis"] = e.analysis
         return jsonify(response), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/tracker", methods=["GET"])
+def get_tracker():
+    try:
+        sort_key = str(request.args.get("sort", "applied_date")).strip()
+        store = load_tracker_store()
+        applications = sorted_tracker_applications(merge_tracker_applications(store), sort_key=sort_key)
+        return jsonify({
+            "success": True,
+            "applications": applications,
+            "summary": summarize_tracker({"applications": applications}),
+            "statuses": TRACKER_STATUSES,
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/tracker/applications", methods=["POST"])
+def create_tracker_application():
+    try:
+        data = request.get_json() or {}
+        company_name = str(data.get("company_name", "")).strip()
+        resume_content = str(data.get("resume_content", "")).strip()
+        job_description = str(data.get("job_description", "")).strip()
+        applied_date = str(data.get("applied_date", "")).strip() or today_iso_date()
+        if not resume_content:
+            return jsonify({"success": False, "error": "Resume content is required"}), 400
+        if not company_name and not str((data.get("analysis") or {}).get("company_name", "")).strip():
+            return jsonify({"success": False, "error": "Company name is required"}), 400
+
+        store = load_tracker_store()
+        target_output_dir = str(data.get("output_dir", "")).strip()
+        existing = None
+        if target_output_dir:
+            existing = next((item for item in store["applications"] if str(item.get("output_dir", "")).strip() == target_output_dir), None)
+        if not existing and target_output_dir:
+            existing = next((item for item in scan_output_tracker_applications() if str(item.get("output_dir", "")).strip() == target_output_dir), None)
+
+        application = build_tracker_application_record(
+            company_name=company_name,
+            job_description=job_description,
+            resume_content=resume_content,
+            analysis_payload=data.get("analysis") or {},
+            applied_date=applied_date,
+            status=str(data.get("status", "Applied")),
+            source=str(data.get("source", "")),
+            job_url=str(data.get("job_url", "")),
+            notes=str(data.get("notes", "")),
+            pdf_path=str(data.get("pdf_path", "")),
+            output_dir=target_output_dir,
+            contact_override=data.get("contact_override") or {},
+            identity=str(data.get("identity", "outlook")),
+        )
+        if existing:
+            history = list(existing.get("history") or [])
+            if not history:
+                history = application.get("history", [])
+            application["id"] = str(existing.get("id", application["id"]))
+            application["created_at"] = str(existing.get("created_at", application["created_at"]))
+            application["history"] = history
+            application["status"] = normalize_tracker_status(data.get("status", existing.get("status", "Applied")))
+            application["status_updated_date"] = applied_date if application["status"] != existing.get("status") else str(existing.get("status_updated_date", applied_date))
+            application["last_updated_date"] = datetime.now().isoformat(timespec="seconds")
+            application["notes"] = str(data.get("notes", "")).strip() or str(existing.get("notes", "")).strip()
+            if application["status"] != existing.get("status"):
+                application["history"] = history + [{
+                    "status": application["status"],
+                    "changed_at": application["last_updated_date"],
+                    "effective_date": application["status_updated_date"],
+                    "note": application["notes"],
+                }]
+
+            replaced = False
+            for index, item in enumerate(store["applications"]):
+                if str(item.get("id", "")) == application["id"] or str(item.get("output_dir", "")).strip() == target_output_dir:
+                    store["applications"][index] = application
+                    replaced = True
+                    break
+            if not replaced:
+                store["applications"].append(application)
+        else:
+            store["applications"].append(application)
+        save_tracker_store(store)
+        merged_applications = merge_tracker_applications(store)
+        response_application = next(
+            (
+                item for item in merged_applications
+                if str(item.get("id", "")) == str(application.get("id", ""))
+                or (target_output_dir and str(item.get("output_dir", "")).strip() == target_output_dir)
+            ),
+            application,
+        )
+        return jsonify({
+            "success": True,
+            "application": response_application,
+            "summary": summarize_tracker({"applications": merged_applications}),
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/tracker/applications/<application_id>/status", methods=["POST"])
+def update_tracker_application_status(application_id: str):
+    try:
+        data = request.get_json() or {}
+        new_status = normalize_tracker_status(data.get("status", ""))
+        note = str(data.get("note", "")).strip()
+        effective_date = str(data.get("effective_date", "")).strip() or today_iso_date()
+        store = load_tracker_store()
+        applications = store.get("applications", [])
+        record = next((item for item in applications if item.get("id") == application_id), None)
+        if not record:
+            discovered = next((item for item in scan_output_tracker_applications() if item.get("id") == application_id), None)
+            if not discovered:
+                return jsonify({"success": False, "error": "Application not found"}), 404
+            record = {**discovered}
+            applications.append(record)
+
+        now_iso = datetime.now().isoformat(timespec="seconds")
+        record["status"] = new_status
+        record["last_updated_date"] = now_iso
+        record["status_updated_date"] = effective_date
+        if note:
+            record["notes"] = note
+        history = record.get("history") or []
+        history.append({
+            "status": new_status,
+            "changed_at": now_iso,
+            "effective_date": effective_date,
+            "note": note,
+        })
+        record["history"] = history
+        save_tracker_store(store)
+        merged_applications = merge_tracker_applications(store)
+        updated_record = next((item for item in merged_applications if item.get("id") == application_id), record)
+        return jsonify({
+            "success": True,
+            "application": updated_record,
+            "summary": summarize_tracker({"applications": merged_applications}),
+        })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

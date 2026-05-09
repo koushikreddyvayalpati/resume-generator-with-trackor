@@ -209,6 +209,119 @@ function combineCoreDraft(titleSummaryContent, skillsContent) {
     .join("\n\n");
 }
 
+function formatDateShort(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function daysSince(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
+}
+
+function dateValueForCompare(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+function TrackerBoard({ applications, statuses, onStatusChange }) {
+  return (
+    <div className="tracker-board">
+      {statuses.map((status) => {
+        const items = applications.filter((item) => item.status === status);
+        return (
+          <section key={status} className="tracker-column">
+            <div className="tracker-column-header">
+              <span>{status}</span>
+              <span className="badge">{items.length}</span>
+            </div>
+            <div className="tracker-card-list">
+              {items.length ? items.map((item) => (
+                <article key={item.id} className="tracker-card">
+                  <div className="tracker-card-top">
+                    <div>
+                      <div className="tracker-card-company">{item.company_name}</div>
+                      <div className="tracker-card-role">{item.role_title}</div>
+                    </div>
+                    {item.role_family ? <span className="badge">{item.role_family}</span> : null}
+                  </div>
+                  <div className="tracker-card-meta">
+                    <span>Applied {formatDateShort(item.applied_date)}</span>
+                    <span>Updated {formatDateShort(item.status_updated_date || item.last_updated_date)}</span>
+                  </div>
+                  <div className="tracker-card-meta">
+                    <span>{daysSince(item.applied_date) ?? 0}d since apply</span>
+                    <span>{daysSince(item.status_updated_date || item.last_updated_date) ?? 0}d since update</span>
+                  </div>
+                  <div className="tracker-card-actions">
+                    <select value={item.status} onChange={(e) => onStatusChange(item.id, e.target.value)}>
+                      {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </div>
+                </article>
+              )) : (
+                <div className="tracker-empty-column">No applications</div>
+              )}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function TrackerTable({ applications, statuses, onStatusChange }) {
+  return (
+    <div className="tracker-table-shell">
+      <table className="tracker-table">
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Applied</th>
+            <th>Last Update</th>
+            <th>Since Apply</th>
+            <th>Since Update</th>
+            <th>Resume</th>
+          </tr>
+        </thead>
+        <tbody>
+          {applications.length ? applications.map((item) => (
+            <tr key={item.id}>
+              <td>
+                <div className="tracker-table-company">{item.company_name}</div>
+                {item.role_family ? <div className="tracker-table-subtle">{item.role_family}</div> : null}
+              </td>
+              <td>{item.role_title}</td>
+              <td>
+                <select value={item.status} onChange={(e) => onStatusChange(item.id, e.target.value)}>
+                  {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </td>
+              <td>{formatDateShort(item.applied_date)}</td>
+              <td>{formatDateShort(item.status_updated_date || item.last_updated_date)}</td>
+              <td>{daysSince(item.applied_date) ?? "—"}d</td>
+              <td>{daysSince(item.status_updated_date || item.last_updated_date) ?? "—"}d</td>
+              <td>{item.resume_snapshot?.title || item.target_role || "Locked"}</td>
+            </tr>
+          )) : (
+            <tr>
+              <td colSpan={8} className="tracker-empty-row">No applications tracked yet.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function App() {
   const [profile, setProfile] = useState(emptyProfile);
   const [profileDraft, setProfileDraft] = useState(emptyProfile);
@@ -230,6 +343,7 @@ export default function App() {
   const [aiThread, setAiThread] = useState([]);
   const [aiError, setAiError] = useState("");
   const [showGeneratedArea, setShowGeneratedArea] = useState(false);
+  const [latestAnalysis, setLatestAnalysis] = useState(null);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [reachoutLoading, setReachoutLoading] = useState(false);
   const [aiStage, setAiStage] = useState("");
@@ -247,6 +361,24 @@ export default function App() {
     settings: false,
     profile: false,
     controls: false,
+    tracker: false,
+    trackApply: false,
+  });
+  const [trackerData, setTrackerData] = useState({ applications: [], summary: { counts: {}, total: 0 }, statuses: ["Applied", "Updated", "Converted", "Ghosted", "Rejected"] });
+  const [trackerLoading, setTrackerLoading] = useState(false);
+  const [trackerError, setTrackerError] = useState("");
+  const [trackerView, setTrackerView] = useState("board");
+  const [trackerFilters, setTrackerFilters] = useState({
+    query: "",
+    applied_from: "",
+    applied_to: "",
+  });
+  const [trackApplyDraft, setTrackApplyDraft] = useState({
+    applied_date: new Date().toISOString().slice(0, 10),
+    source: "",
+    job_url: "",
+    notes: "",
+    status: "Applied",
   });
 
   const mediaRecorderRef = useRef(null);
@@ -282,6 +414,8 @@ export default function App() {
       .catch((error) => {
         setAiStatus((current) => ({ ...current, ready: false, message: error.message }));
       });
+
+    loadTracker();
   }, []);
 
   useEffect(() => {
@@ -369,6 +503,23 @@ export default function App() {
 
   const statusBadgeClass = aiStatus.ready ? "badge status-ok" : "badge status-error";
   const jdModeLabel = showGeneratedArea ? "Current JD active" : "Waiting for new JD";
+  const filteredTrackerApplications = useMemo(() => {
+    const query = trackerFilters.query.trim().toLowerCase();
+    const from = trackerFilters.applied_from;
+    const to = trackerFilters.applied_to;
+    return (trackerData.applications || []).filter((item) => {
+      const company = String(item.company_name || "").toLowerCase();
+      const role = String(item.role_title || "").toLowerCase();
+      if (query && !company.includes(query) && !role.includes(query)) {
+        return false;
+      }
+      const applied = dateValueForCompare(item.applied_date);
+      if (from && applied && applied < from) return false;
+      if (to && applied && applied > to) return false;
+      if ((from || to) && !applied) return false;
+      return true;
+    });
+  }, [trackerData.applications, trackerFilters]);
 
   function openModal(name) {
     if (name === "settings") {
@@ -387,6 +538,9 @@ export default function App() {
         });
       }).catch(() => {});
     }
+    if (name === "tracker") {
+      loadTracker();
+    }
     setModals((current) => ({ ...current, [name]: true }));
   }
 
@@ -402,6 +556,7 @@ export default function App() {
     setAiThread([]);
     setAiError("");
     setShowGeneratedArea(false);
+    setLatestAnalysis(null);
     setGeneratedContent("");
     setAiStage("");
     if (clearJd) setComposerInput("");
@@ -412,6 +567,79 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId }),
       }).catch(() => {});
+    }
+  }
+
+  function loadTracker() {
+    setTrackerLoading(true);
+    setTrackerError("");
+    fetchJson("/api/tracker")
+      .then((data) => setTrackerData({
+        applications: data.applications || [],
+        summary: data.summary || { counts: {}, total: 0 },
+        statuses: data.statuses || ["Applied", "Updated", "Converted", "Ghosted", "Rejected"],
+      }))
+      .catch((error) => setTrackerError(error.message))
+      .finally(() => setTrackerLoading(false));
+  }
+
+  async function submitTrackApplication() {
+    if (!generatedContent.trim()) {
+      setAiError("Generate a resume first before tracking an application.");
+      return;
+    }
+    if (!companyName.trim() && !(latestAnalysis?.company_name || "").trim()) {
+      setAiError("Add the company name before tracking the application.");
+      return;
+    }
+
+    try {
+      const data = await fetchJson("/api/tracker/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name: companyName,
+          job_description: lastGeneratedJd,
+          resume_content: generatedContent,
+          analysis: latestAnalysis || {},
+          applied_date: trackApplyDraft.applied_date,
+          status: trackApplyDraft.status,
+          source: trackApplyDraft.source,
+          job_url: trackApplyDraft.job_url,
+          notes: trackApplyDraft.notes,
+          pdf_path: pdfState.pdfPath,
+          output_dir: pdfState.outputDir,
+          contact_override: contact,
+          identity,
+        }),
+      });
+      setTrackerData((current) => ({
+        applications: [data.application, ...(current.applications || [])],
+        summary: data.summary || current.summary,
+        statuses: current.statuses,
+      }));
+      closeModal("trackApply");
+      setTrackApplyDraft((current) => ({ ...current, notes: "", source: "", job_url: "" }));
+      openModal("tracker");
+    } catch (error) {
+      setAiError(error.message || "Failed to track the application.");
+    }
+  }
+
+  async function updateTrackedStatus(applicationId, nextStatus) {
+    try {
+      const data = await fetchJson(`/api/tracker/applications/${applicationId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus, effective_date: new Date().toISOString().slice(0, 10) }),
+      });
+      setTrackerData((current) => ({
+        applications: (current.applications || []).map((item) => item.id === applicationId ? data.application : item),
+        summary: data.summary || current.summary,
+        statuses: current.statuses,
+      }));
+    } catch (error) {
+      setTrackerError(error.message || "Failed to update status.");
     }
   }
 
@@ -560,6 +788,7 @@ export default function App() {
       const nextSessionId = analyzeData.session_id || aiSessionId || null;
       setAiSessionId(nextSessionId);
       setLastGeneratedJd(jd);
+      setLatestAnalysis(analyzeData.analysis || null);
       setMemoryCount(analyzeData.memory_count || 0);
       if ((analyzeData.analysis?.company_name || "").trim()) {
         setCompanyName((current) => current.trim() || analyzeData.analysis.company_name.trim());
@@ -832,6 +1061,7 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <button className="icon-button" onClick={() => openModal("controls")}>ID</button>
+          <button className="icon-button" onClick={() => openModal("tracker")}>Tracker</button>
           <button className="icon-button" onClick={() => openModal("instructions")}>?</button>
           <button className="icon-button" onClick={() => openModal("settings")}>⚙</button>
           <span className={pdfStatus.ready ? "badge status-ok" : "badge status-error"}>
@@ -973,6 +1203,13 @@ export default function App() {
                   onClick={submitPdfGeneration}
                 >
                   Generate PDF
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={!generatedContent.trim()}
+                  onClick={() => openModal("trackApply")}
+                >
+                  Add Tracker Details
                 </button>
               </div>
             </div>
@@ -1141,6 +1378,104 @@ export default function App() {
           {memoryCount > 0 ? <span className="badge">Memory {memoryCount}/{aiStatus.memory_limit || 2}</span> : null}
         </div>
       </SideDrawer>
+
+      <Modal
+        open={modals.trackApply}
+        title="Tracker Details"
+        onClose={() => closeModal("trackApply")}
+        footer={(
+          <>
+            <button className="secondary-button" onClick={() => closeModal("trackApply")}>Cancel</button>
+            <button className="primary-button" onClick={submitTrackApplication}>Save</button>
+          </>
+        )}
+      >
+        <div className="tracker-form-grid">
+          <label className="field">
+            Company
+            <input value={companyName || latestAnalysis?.company_name || ""} onChange={(e) => setCompanyName(e.target.value)} />
+          </label>
+          <label className="field">
+            Applied Date
+            <input type="date" value={trackApplyDraft.applied_date} onChange={(e) => setTrackApplyDraft((current) => ({ ...current, applied_date: e.target.value }))} />
+          </label>
+          <label className="field">
+            Status
+            <select value={trackApplyDraft.status} onChange={(e) => setTrackApplyDraft((current) => ({ ...current, status: e.target.value }))}>
+              {trackerData.statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+          </label>
+          <label className="field">
+            Source
+            <input placeholder="LinkedIn, company site, referral..." value={trackApplyDraft.source} onChange={(e) => setTrackApplyDraft((current) => ({ ...current, source: e.target.value }))} />
+          </label>
+        </div>
+        <label className="field">
+          Job URL
+          <input placeholder="Optional job link" value={trackApplyDraft.job_url} onChange={(e) => setTrackApplyDraft((current) => ({ ...current, job_url: e.target.value }))} />
+        </label>
+        <label className="field">
+          Notes
+          <textarea placeholder="Optional notes" value={trackApplyDraft.notes} onChange={(e) => setTrackApplyDraft((current) => ({ ...current, notes: e.target.value }))} />
+        </label>
+        <div className="tracker-lock-note">
+          Saved resume folders are tracked automatically. Use this to attach details like source, link, notes, or a manual status to the current saved application.
+        </div>
+      </Modal>
+
+      <Modal
+        open={modals.tracker}
+        title="Application Tracker"
+        onClose={() => closeModal("tracker")}
+      >
+        <div className="tracker-summary-row">
+          <span className="badge">Total {trackerData.summary?.total || 0}</span>
+          {trackerData.statuses.map((status) => (
+            <span key={status} className="badge">{status} {trackerData.summary?.counts?.[status] || 0}</span>
+          ))}
+        </div>
+        <div className="tracker-filters">
+          <input
+            className="tracker-search"
+            placeholder="Search company or role"
+            value={trackerFilters.query}
+            onChange={(e) => setTrackerFilters((current) => ({ ...current, query: e.target.value }))}
+          />
+          <div className="tracker-date-filters">
+            <label className="field">
+              Applied From
+              <input
+                type="date"
+                value={trackerFilters.applied_from}
+                onChange={(e) => setTrackerFilters((current) => ({ ...current, applied_from: e.target.value }))}
+              />
+            </label>
+            <label className="field">
+              Applied To
+              <input
+                type="date"
+                value={trackerFilters.applied_to}
+                onChange={(e) => setTrackerFilters((current) => ({ ...current, applied_to: e.target.value }))}
+              />
+            </label>
+          </div>
+        </div>
+        <div className="tracker-toolbar">
+          <div className="identity-group tracker-view-toggle">
+            <button className={`toggle-button ${trackerView === "board" ? "active" : ""}`} onClick={() => setTrackerView("board")}>Board</button>
+            <button className={`toggle-button ${trackerView === "table" ? "active" : ""}`} onClick={() => setTrackerView("table")}>Table</button>
+          </div>
+          <button className="secondary-button" onClick={loadTracker}>Refresh</button>
+        </div>
+        {trackerError ? <div className="error-banner">{trackerError}</div> : null}
+        {trackerLoading ? (
+          <div className="blank-state">Loading tracker…</div>
+        ) : trackerView === "board" ? (
+          <TrackerBoard applications={filteredTrackerApplications} statuses={trackerData.statuses} onStatusChange={updateTrackedStatus} />
+        ) : (
+          <TrackerTable applications={filteredTrackerApplications} statuses={trackerData.statuses} onStatusChange={updateTrackedStatus} />
+        )}
+      </Modal>
     </div>
   );
 }
