@@ -255,6 +255,11 @@ function TrackerBoard({ applications, statuses, onStatusChange }) {
                     <span>Applied {formatDateShort(item.applied_date)}</span>
                     <span>Updated {formatDateShort(item.status_updated_date || item.last_updated_date)}</span>
                   </div>
+                  {item.folder_group ? (
+                    <div className="tracker-card-meta">
+                      <span>Folder group: {item.folder_group}</span>
+                    </div>
+                  ) : null}
                   <div className="tracker-card-meta">
                     <span>{daysSince(item.applied_date) ?? 0}d since apply</span>
                     <span>{daysSince(item.status_updated_date || item.last_updated_date) ?? 0}d since update</span>
@@ -298,6 +303,7 @@ function TrackerTable({ applications, statuses, onStatusChange }) {
               <td>
                 <div className="tracker-table-company">{item.company_name}</div>
                 {item.role_family ? <div className="tracker-table-subtle">{item.role_family}</div> : null}
+                {item.folder_group ? <div className="tracker-table-subtle">Folder group: {item.folder_group}</div> : null}
               </td>
               <td>{item.role_title}</td>
               <td>

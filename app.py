@@ -578,6 +578,16 @@ def build_tracker_application_record(
     role_title = str(parsed_resume.get("title", "")).strip() or str((analysis_payload or {}).get("target_role", "")).strip() or "Untitled Role"
     now_iso = datetime.now().isoformat(timespec="seconds")
     effective_applied_date = str(applied_date or "").strip() or today_iso_date()
+    normalized_output_dir = str(output_dir or "").strip()
+    folder_group = ""
+    if normalized_output_dir:
+        try:
+            output_root = Path(settings["output_directory"]).expanduser().resolve()
+            output_dir_path = Path(normalized_output_dir).expanduser().resolve()
+            relative_parent = output_dir_path.parent.relative_to(output_root)
+            folder_group = "" if str(relative_parent) == "." else str(relative_parent)
+        except Exception:
+            folder_group = ""
     initial_event = {
         "status": normalized_status,
         "changed_at": now_iso,
@@ -598,7 +608,8 @@ def build_tracker_application_record(
         "job_url": str(job_url or "").strip(),
         "notes": str(notes or "").strip(),
         "pdf_path": str(pdf_path or "").strip(),
-        "output_dir": str(output_dir or "").strip(),
+        "output_dir": normalized_output_dir,
+        "folder_group": folder_group,
         "resume_content": str(resume_content or "").strip(),
         "resume_snapshot": parsed_resume,
         "job_description": str(job_description or "").strip(),
@@ -609,7 +620,7 @@ def build_tracker_application_record(
     }
 
 
-def infer_application_from_output_dir(folder: Path) -> dict | None:
+def infer_application_from_output_dir(folder: Path, output_root: Path | None = None) -> dict | None:
     if not folder.is_dir():
         return None
 
@@ -631,6 +642,13 @@ def infer_application_from_output_dir(folder: Path) -> dict | None:
 
     created_iso = file_created_iso(artifact_path)
     application_id = "fs-" + uuid.uuid5(uuid.NAMESPACE_URL, str(folder.resolve())).hex
+    folder_group = ""
+    if output_root is not None:
+        try:
+            relative_parent = folder.parent.resolve().relative_to(output_root.resolve())
+            folder_group = "" if str(relative_parent) == "." else str(relative_parent)
+        except Exception:
+            folder_group = ""
     return {
         "id": application_id,
         "company_name": company_name,
@@ -646,6 +664,7 @@ def infer_application_from_output_dir(folder: Path) -> dict | None:
         "notes": "",
         "pdf_path": str(pdf_path) if pdf_path.exists() else "",
         "output_dir": str(folder),
+        "folder_group": folder_group,
         "resume_content": "",
         "resume_snapshot": {"title": role_title},
         "job_description": "",
@@ -686,7 +705,7 @@ def scan_output_tracker_applications() -> list[dict]:
                 parent_key = str(path.parent.resolve())
                 if parent_key in seen_dirs:
                     continue
-                item = infer_application_from_output_dir(path.parent)
+                item = infer_application_from_output_dir(path.parent, output_root)
                 if item:
                     discovered.append(item)
                     seen_dirs.add(parent_key)
@@ -710,6 +729,7 @@ def scan_output_tracker_applications() -> list[dict]:
                     "notes": "",
                     "pdf_path": str(path) if path.suffix.lower() == ".pdf" else "",
                     "output_dir": str(path.parent),
+                    "folder_group": "",
                     "resume_content": "",
                     "resume_snapshot": {"title": path.stem},
                     "job_description": "",
