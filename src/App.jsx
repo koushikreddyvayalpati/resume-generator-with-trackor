@@ -203,6 +203,71 @@ function parseProjects(text) {
     .filter((project) => project.name);
 }
 
+function formatExperience(experience) {
+  return (experience || [])
+    .map((job) => {
+      const header = [job.company || "", job.title || "", job.dates || "", job.location || ""].join(" | ");
+      const bullets = (job.bullets || []).map((bullet) => `- ${bullet}`).join("\n");
+      return [header, bullets].filter(Boolean).join("\n");
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function parseExperience(text) {
+  return (text || "")
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map((block) => {
+      const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+      const headerParts = (lines.shift() || "").split("|").map((part) => part.trim());
+      const [company = "", title = "", dates = "", location = ""] = headerParts;
+      const bullets = lines.map((line) => line.replace(/^[-•●]\s*/, "").trim()).filter(Boolean);
+      return { company, title, dates, location, bullets };
+    })
+    .filter((job) => job.company || job.title || job.bullets.length);
+}
+
+function formatSkills(skills) {
+  return (skills || [])
+    .map((skill) => `${skill.category || ""}: ${skill.items || ""}`.trim())
+    .filter((line) => line && line !== ":")
+    .join("\n");
+}
+
+function parseSkills(text) {
+  return (text || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const idx = line.indexOf(":");
+      if (idx === -1) return { category: "", items: line };
+      return { category: line.slice(0, idx).trim(), items: line.slice(idx + 1).trim() };
+    })
+    .filter((skill) => skill.category || skill.items);
+}
+
+function formatEducation(education) {
+  return (education || [])
+    .map((edu) => [edu.degree || "", edu.institution || "", edu.dates || ""].join(" | "))
+    .filter((line) => line.replace(/\|/g, "").trim())
+    .join("\n");
+}
+
+function parseEducation(text) {
+  return (text || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [degree = "", institution = "", dates = ""] = line.split("|").map((part) => part.trim());
+      return { degree, institution, dates };
+    })
+    .filter((edu) => edu.degree || edu.institution);
+}
+
 function combineCoreDraft(titleSummaryContent, skillsContent) {
   return [titleSummaryContent?.trim(), skillsContent?.trim(), "Professional Experience"]
     .filter(Boolean)
@@ -541,6 +606,11 @@ export default function App() {
           contact: { ...(data.contact || emptyProfile.contact) },
           certificationsText: (data.certifications || []).join("\n"),
           projectsText: formatProjects(data.projects || []),
+          title: data.title || "",
+          summary: data.summary || "",
+          experienceText: formatExperience(data.experience || []),
+          skillsText: formatSkills(data.technical_skills || []),
+          educationText: formatEducation(data.education || []),
         });
       }).catch(() => {});
     }
@@ -990,6 +1060,11 @@ export default function App() {
         .map((line) => line.trim())
         .filter(Boolean),
       projects: parseProjects(profileDraft.projectsText || ""),
+      title: profileDraft.title || "",
+      summary: profileDraft.summary || "",
+      experience: parseExperience(profileDraft.experienceText || ""),
+      technical_skills: parseSkills(profileDraft.skillsText || ""),
+      education: parseEducation(profileDraft.educationText || ""),
     };
 
     fetchJson("/api/profile", {
@@ -1067,6 +1142,7 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <button className="icon-button" onClick={() => openModal("controls")}>ID</button>
+          <button className="icon-button" onClick={() => openModal("profile")}>Profile</button>
           <button className="icon-button" onClick={() => openModal("tracker")}>Tracker</button>
           <button className="icon-button" onClick={() => openModal("instructions")}>?</button>
           <button className="icon-button" onClick={() => openModal("settings")}>⚙</button>
@@ -1341,11 +1417,36 @@ export default function App() {
           </label>
         </div>
         <label className="field">
+          Professional Title
+          <input value={profileDraft.title || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, title: e.target.value }))} />
+        </label>
+        <label className="field">
+          Summary
+          <textarea value={profileDraft.summary || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, summary: e.target.value }))} />
+        </label>
+        <label className="field">
+          Work Experience
+          <small className="field-hint">One job per block (blank line between jobs). First line: <code>Company | Title | Dates | Location</code>. Then one bullet per line starting with “-”.</small>
+          <textarea rows={12} value={profileDraft.experienceText ?? formatExperience(profileDraft.experience || [])} onChange={(e) => setProfileDraft((current) => ({ ...current, experienceText: e.target.value }))} />
+        </label>
+        <label className="field">
+          Technical Skills
+          <small className="field-hint">One category per line: <code>Category: item1, item2, item3</code></small>
+          <textarea rows={6} value={profileDraft.skillsText ?? formatSkills(profileDraft.technical_skills || [])} onChange={(e) => setProfileDraft((current) => ({ ...current, skillsText: e.target.value }))} />
+        </label>
+        <label className="field">
+          Education
+          <small className="field-hint">One entry per line: <code>Degree | Institution | Dates</code></small>
+          <textarea rows={3} value={profileDraft.educationText ?? formatEducation(profileDraft.education || [])} onChange={(e) => setProfileDraft((current) => ({ ...current, educationText: e.target.value }))} />
+        </label>
+        <label className="field">
           Certifications
+          <small className="field-hint">One certification per line.</small>
           <textarea value={profileDraft.certificationsText || (profileDraft.certifications || []).join("\n")} onChange={(e) => setProfileDraft((current) => ({ ...current, certificationsText: e.target.value }))} />
         </label>
         <label className="field">
           Projects
+          <small className="field-hint">One project per block (blank line between). First line: project name. Then one bullet per line starting with “-”.</small>
           <textarea value={profileDraft.projectsText || formatProjects(profileDraft.projects || [])} onChange={(e) => setProfileDraft((current) => ({ ...current, projectsText: e.target.value }))} />
         </label>
       </Modal>

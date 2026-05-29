@@ -624,10 +624,17 @@ def infer_application_from_output_dir(folder: Path, output_root: Path | None = N
     if not folder.is_dir():
         return None
 
-    docx_path = folder / "tharun manikonda resume.docx"
-    pdf_path = folder / "tharun manikonda resume.pdf"
+    def _find_resume_artifact(suffix: str) -> Path | None:
+        matches = sorted(
+            p for p in folder.glob(f"*{suffix}")
+            if p.is_file() and p.stem.lower().endswith("resume")
+        )
+        return matches[0] if matches else None
+
+    docx_path = _find_resume_artifact(".docx")
+    pdf_path = _find_resume_artifact(".pdf")
     status_path = folder / "pdf_status.json"
-    artifact_path = docx_path if docx_path.exists() else pdf_path if pdf_path.exists() else None
+    artifact_path = docx_path if docx_path else pdf_path if pdf_path else None
     if artifact_path is None:
         return None
 
@@ -662,7 +669,7 @@ def infer_application_from_output_dir(folder: Path, output_root: Path | None = N
         "source": "",
         "job_url": "",
         "notes": "",
-        "pdf_path": str(pdf_path) if pdf_path.exists() else "",
+        "pdf_path": str(pdf_path) if pdf_path else "",
         "output_dir": str(folder),
         "folder_group": folder_group,
         "resume_content": "",
@@ -701,7 +708,7 @@ def scan_output_tracker_applications() -> list[dict]:
         )
 
         for path in candidate_files:
-            if path.name.lower() in {"tharun manikonda resume.docx", "tharun manikonda resume.pdf"} and path.parent != output_root:
+            if path.stem.lower().endswith("resume") and path.parent != output_root:
                 parent_key = str(path.parent.resolve())
                 if parent_key in seen_dirs:
                     continue
@@ -3845,6 +3852,31 @@ def safe_folder_name(title: str, output_root: str = None) -> str:
     return name
 
 
+def resume_file_basename(resume: dict | None = None) -> str:
+    """Derive the resume artifact filename (without extension) from the
+    person's name, so the tool works for any user instead of a hardcoded name.
+
+    Falls back to the configured profile name, then a generic default.
+    """
+    name = ""
+    if isinstance(resume, dict):
+        name = str(resume.get("name", "")).strip()
+    if not name:
+        try:
+            name = str(current_profile().get("name", "")).strip()
+        except Exception:
+            name = ""
+    if not name:
+        name = "resume"
+    # Normalize: drop filesystem-unsafe chars, collapse whitespace, lowercase.
+    name = re.sub(r'[\\/*?:"<>|→]', " ", name)
+    name = re.sub(r"\s+", " ", name).strip().lower()
+    if not name:
+        name = "resume"
+    base = name if name.endswith("resume") else f"{name} resume"
+    return base[:100]
+
+
 def display_folder_name(company_name: str, title: str, custom_folder: str) -> str:
     if custom_folder:
         return custom_folder
@@ -3933,6 +3965,105 @@ def apply_profile_overrides(resume: dict) -> dict:
     resume["projects"] = profile.get("projects", resume.get("projects", []))
     resume["certifications"] = profile.get("certifications", resume.get("certifications", []))
     return resume
+
+
+def save_base_resume(resume: dict) -> None:
+    """Persist the base resume template back to disk."""
+    with open(BASE_RESUME_PATH, "w", encoding="utf-8") as f:
+        json.dump(resume, f, indent=2, ensure_ascii=False)
+
+
+def normalize_experience_entries(entries) -> list[dict]:
+    """Normalize a list of work-experience entries, dropping empty ones."""
+    if not isinstance(entries, list):
+        return []
+    normalized = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        company = str(entry.get("company", "")).strip()
+        title = str(entry.get("title", "")).strip()
+        location = str(entry.get("location", "")).strip()
+        dates = str(entry.get("dates", "")).strip()
+        bullets = [str(b).strip() for b in entry.get("bullets", []) if str(b).strip()]
+        # Keep an entry if it has any meaningful content.
+        if company or title or bullets:
+            normalized.append({
+                "company": company,
+                "location": location,
+                "title": title,
+                "dates": dates,
+                "bullets": bullets,
+            })
+    return normalized
+
+
+def normalize_skill_entries(entries) -> list[dict]:
+    """Normalize technical-skills entries of shape {category, items}."""
+    if not isinstance(entries, list):
+        return []
+    normalized = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        category = str(entry.get("category", "")).strip()
+        items = entry.get("items", "")
+        if isinstance(items, list):
+            items = ", ".join(str(i).strip() for i in items if str(i).strip())
+        items = str(items).strip()
+        if category or items:
+            normalized.append({"category": category, "items": items})
+    return normalized
+
+
+def normalize_education_entries(entries) -> list[dict]:
+    """Normalize education entries of shape {degree, institution, dates}."""
+    if not isinstance(entries, list):
+        return []
+    normalized = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        degree = str(entry.get("degree", "")).strip()
+        institution = str(entry.get("institution", "")).strip()
+        dates = str(entry.get("dates", "")).strip()
+        if degree or institution:
+            normalized.append({"degree": degree, "institution": institution, "dates": dates})
+    return normalized
+
+
+def apply_base_resume_edits(payload: dict) -> bool:
+    """Non-destructively merge structural edits into base_resume.json.
+
+    Only keys present in the payload are touched; everything else is
+    preserved exactly as it was. Returns True if anything was written.
+    """
+    structural_keys = ("title", "summary", "experience", "technical_skills", "education")
+    if not any(key in payload for key in structural_keys):
+        return False
+
+    base_resume = load_base_resume()
+    changed = False
+
+    if "title" in payload:
+        base_resume["title"] = str(payload.get("title", "")).strip()
+        changed = True
+    if "summary" in payload:
+        base_resume["summary"] = str(payload.get("summary", "")).strip()
+        changed = True
+    if "experience" in payload:
+        base_resume["experience"] = normalize_experience_entries(payload.get("experience"))
+        changed = True
+    if "technical_skills" in payload:
+        base_resume["technical_skills"] = normalize_skill_entries(payload.get("technical_skills"))
+        changed = True
+    if "education" in payload:
+        base_resume["education"] = normalize_education_entries(payload.get("education"))
+        changed = True
+
+    if changed:
+        save_base_resume(base_resume)
+    return changed
 
 
 def normalize_profile(payload: dict) -> dict:
@@ -4127,8 +4258,19 @@ def update_settings():
 
 @app.route("/api/profile", methods=["GET"])
 def get_profile():
-    """Get editable profile defaults used for every generated resume."""
-    return jsonify(current_profile())
+    """Get editable profile defaults used for every generated resume.
+
+    Includes the structural base-resume fields (title, summary, experience,
+    skills, education) so the UI can pre-fill them and edit non-destructively.
+    """
+    profile = current_profile()
+    base_resume = load_base_resume()
+    profile["title"] = base_resume.get("title", "")
+    profile["summary"] = base_resume.get("summary", "")
+    profile["experience"] = base_resume.get("experience", [])
+    profile["technical_skills"] = base_resume.get("technical_skills", [])
+    profile["education"] = base_resume.get("education", [])
+    return jsonify(profile)
 
 
 @app.route("/api/profile", methods=["POST"])
@@ -4136,10 +4278,14 @@ def update_profile():
     """Save editable profile defaults without changing the paste/generate flow."""
     try:
         data = request.get_json() or {}
+        # Persist structural edits (experience, skills, education, title,
+        # summary) directly into base_resume.json — only fields present in
+        # the payload are touched, everything else is preserved.
+        apply_base_resume_edits(data)
         profile = normalize_profile(data)
         settings["profile"] = profile
         save_settings(settings)
-        return jsonify({"success": True, "profile": current_profile()})
+        return jsonify({"success": True, "profile": get_profile().get_json()})
     except AIStageError as e:
         response = {
             "success": False,
@@ -5010,11 +5156,12 @@ def generate():
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # Build DOCX
-        docx_path = out_dir / "tharun manikonda resume.docx"
+        resume_basename = resume_file_basename(merged_resume)
+        docx_path = out_dir / f"{resume_basename}.docx"
         build_resume_docx(merged_resume, str(docx_path), format_profile=identity)
 
         # Start background PDF conversion
-        pdf_path = out_dir / "tharun manikonda resume.pdf"
+        pdf_path = out_dir / f"{resume_basename}.pdf"
         status_path = out_dir / "pdf_status.json"
         metadata = {
             "folder": folder_name,

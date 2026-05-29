@@ -953,6 +953,20 @@ select:focus {
   min-height: 120px;
 }
 
+.field-hint {
+  color: var(--muted);
+  font-size: 0.78rem;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+.field-hint code {
+  background: rgba(127, 127, 127, 0.15);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 0.74rem;
+}
+
 .profile-grid {
   display: grid;
   gap: 12px;
