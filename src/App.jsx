@@ -734,7 +734,11 @@ export default function App() {
 
   async function startVoiceInput(target, setter) {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setAiError("Local voice recording is not supported in this browser.");
+      setAiError("Voice recording isn't supported in this browser. Try a recent Chrome or Safari.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      setAiError("Microphone needs a secure context. Open the app at http://localhost:5001 (not via an IP address).");
       return;
     }
 
@@ -800,7 +804,20 @@ export default function App() {
       recorder.start();
     } catch (error) {
       setRecordingTarget("");
-      setAiError("Microphone access failed.");
+      const name = error?.name || "";
+      console.error("[mic]", name, error);
+      if (name === "NotAllowedError" || name === "SecurityError") {
+        setAiError(
+          "Microphone permission denied. Click the lock icon in the address bar → Site settings → set Microphone to Allow. " +
+          "On macOS also check System Settings → Privacy & Security → Microphone → Chrome."
+        );
+      } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+        setAiError("No microphone was found. Plug one in or pick one in System Settings → Sound → Input.");
+      } else if (name === "NotReadableError") {
+        setAiError("Your microphone is busy in another app. Close Zoom/Meet/Slack/etc., then try again.");
+      } else {
+        setAiError(`Microphone access failed${name ? ` (${name})` : ""}. Check browser permissions and try again.`);
+      }
     }
   }
 
