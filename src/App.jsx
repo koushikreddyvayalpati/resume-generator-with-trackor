@@ -404,6 +404,7 @@ export default function App() {
   const [contact, setContact] = useState({ location: "", phone: "", email: "" });
   const [companyName, setCompanyName] = useState("");
   const [composerInput, setComposerInput] = useState("");
+  const [profileList, setProfileList] = useState({ active: "", profiles: [] });
   const [generatedContent, setGeneratedContent] = useState("");
   const [preview, setPreview] = useState(null);
   const [validation, setValidation] = useState({ valid: false, errors: [] });
@@ -478,6 +479,10 @@ export default function App() {
         });
         setContact(data.contact || emptyProfile.contact);
       })
+      .catch(() => {});
+
+    fetchJson("/api/profiles")
+      .then((data) => setProfileList({ active: data.active || "", profiles: data.profiles || [] }))
       .catch(() => {});
 
     fetchJson("/api/ai/status")
@@ -600,19 +605,21 @@ export default function App() {
       }).catch(() => {});
     }
     if (name === "profile") {
-      fetchJson("/api/profile").then((data) => {
-        setProfileDraft({
-          ...data,
-          contact: { ...(data.contact || emptyProfile.contact) },
-          certificationsText: (data.certifications || []).join("\n"),
-          projectsText: formatProjects(data.projects || []),
-          title: data.title || "",
-          summary: data.summary || "",
-          experienceText: formatExperience(data.experience || []),
-          skillsText: formatSkills(data.technical_skills || []),
-          educationText: formatEducation(data.education || []),
-        });
-      }).catch(() => {});
+      Promise.all([fetchJson("/api/profile"), fetchJson("/api/profiles")])
+        .then(([data, list]) => {
+          setProfileDraft({
+            ...data,
+            contact: { ...(data.contact || emptyProfile.contact) },
+            certificationsText: (data.certifications || []).join("\n"),
+            projectsText: formatProjects(data.projects || []),
+            title: data.title || "",
+            summary: data.summary || "",
+            experience: Array.isArray(data.experience) ? data.experience : [],
+            technical_skills: Array.isArray(data.technical_skills) ? data.technical_skills : [],
+            education: Array.isArray(data.education) ? data.education : [],
+          });
+          setProfileList({ active: list.active || "", profiles: list.profiles || [] });
+        }).catch(() => {});
     }
     if (name === "tracker") {
       loadTracker();
@@ -1052,19 +1059,25 @@ export default function App() {
   }
 
   function saveProfile() {
+    const certifications = Array.isArray(profileDraft.certifications)
+      ? profileDraft.certifications.map((c) => String(c || "").trim()).filter(Boolean)
+      : (profileDraft.certificationsText || "")
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+    const projects = Array.isArray(profileDraft.projects) && profileDraft.projects.length
+      ? profileDraft.projects
+      : parseProjects(profileDraft.projectsText || "");
     const payload = {
       name: profileDraft.name || "",
       contact: profileDraft.contact || emptyProfile.contact,
-      certifications: (profileDraft.certificationsText || "")
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean),
-      projects: parseProjects(profileDraft.projectsText || ""),
+      certifications,
+      projects,
       title: profileDraft.title || "",
       summary: profileDraft.summary || "",
-      experience: parseExperience(profileDraft.experienceText || ""),
-      technical_skills: parseSkills(profileDraft.skillsText || ""),
-      education: parseEducation(profileDraft.educationText || ""),
+      experience: profileDraft.experience || [],
+      technical_skills: profileDraft.technical_skills || [],
+      education: profileDraft.education || [],
     };
 
     fetchJson("/api/profile", {
@@ -1077,6 +1090,69 @@ export default function App() {
         setContact(data.profile.contact || emptyProfile.contact);
         closeModal("profile");
       })
+      .catch((error) => window.alert(error.message));
+  }
+
+  function refreshProfileFromServer() {
+    return Promise.all([
+      fetchJson("/api/profile"),
+      fetchJson("/api/profiles"),
+    ]).then(([p, list]) => {
+      setProfile(p);
+      setProfileDraft({ ...p, contact: { ...(p.contact || emptyProfile.contact) } });
+      setContact(p.contact || emptyProfile.contact);
+      setProfileList({ active: list.active || "", profiles: list.profiles || [] });
+    });
+  }
+
+  function switchActiveProfile(name) {
+    if (!name || name === profileList.active) return;
+    fetchJson("/api/profiles/active", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    })
+      .then(() => refreshProfileFromServer())
+      .catch((error) => window.alert(error.message));
+  }
+
+  function createNewProfile() {
+    const name = window.prompt("Name for the new profile:");
+    if (!name || !name.trim()) return;
+    const copyChoice = window.confirm("Copy from the current profile?\nOK = copy, Cancel = start blank");
+    fetchJson("/api/profiles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim(), copy_from: copyChoice ? profileList.active : "" }),
+    })
+      .then(() => refreshProfileFromServer())
+      .catch((error) => window.alert(error.message));
+  }
+
+  function renameActiveProfile() {
+    const current = profileList.active;
+    if (!current) return;
+    const next = window.prompt("Rename profile to:", current);
+    if (!next || !next.trim() || next.trim() === current) return;
+    fetchJson(`/api/profiles/${encodeURIComponent(current)}/rename`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: next.trim() }),
+    })
+      .then(() => refreshProfileFromServer())
+      .catch((error) => window.alert(error.message));
+  }
+
+  function deleteActiveProfile() {
+    const current = profileList.active;
+    if (!current) return;
+    if (profileList.profiles.length <= 1) {
+      window.alert("You can't delete the last profile.");
+      return;
+    }
+    if (!window.confirm(`Delete profile "${current}"? This can't be undone.`)) return;
+    fetchJson(`/api/profiles/${encodeURIComponent(current)}`, { method: "DELETE" })
+      .then(() => refreshProfileFromServer())
       .catch((error) => window.alert(error.message));
   }
 
@@ -1234,6 +1310,19 @@ export default function App() {
               />
               <div className="composer-toolbar">
                 <div className="composer-toolbar-left">
+                  {profileList.profiles.length > 0 && (
+                    <label className="composer-profile-select" title="Resume profile used when generating">
+                      <span className="composer-profile-label">Profile</span>
+                      <select
+                        value={profileList.active}
+                        onChange={(e) => switchActiveProfile(e.target.value)}
+                      >
+                        {profileList.profiles.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <button className="composer-pill" onClick={() => resetAiSession(true)}>New JD</button>
                   <button
                     className="composer-pill"
@@ -1398,6 +1487,27 @@ export default function App() {
           </>
         )}
       >
+        <div className="profile-toolbar">
+          <div className="profile-toolbar-row">
+            <label className="composer-profile-select">
+              <span className="composer-profile-label">Active Profile</span>
+              <select
+                value={profileList.active}
+                onChange={(e) => switchActiveProfile(e.target.value)}
+              >
+                {profileList.profiles.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+            </label>
+            <div className="profile-toolbar-actions">
+              <button className="secondary-button" onClick={createNewProfile}>+ New</button>
+              <button className="secondary-button" onClick={renameActiveProfile}>Rename</button>
+              <button className="secondary-button danger" onClick={deleteActiveProfile}>Delete</button>
+            </div>
+          </div>
+          <small className="field-hint">Profiles let you keep separate résumés (e.g. one per role family). Edits below apply to the active profile.</small>
+        </div>
         <div className="profile-grid">
           <label className="field">
             Name
@@ -1424,21 +1534,81 @@ export default function App() {
           Summary
           <textarea value={profileDraft.summary || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, summary: e.target.value }))} />
         </label>
-        <label className="field">
-          Work Experience
-          <small className="field-hint">One job per block (blank line between jobs). First line: <code>Company | Title | Dates | Location</code>. Then one bullet per line starting with “-”.</small>
-          <textarea rows={12} value={profileDraft.experienceText ?? formatExperience(profileDraft.experience || [])} onChange={(e) => setProfileDraft((current) => ({ ...current, experienceText: e.target.value }))} />
-        </label>
-        <label className="field">
-          Technical Skills
-          <small className="field-hint">One category per line: <code>Category: item1, item2, item3</code></small>
-          <textarea rows={6} value={profileDraft.skillsText ?? formatSkills(profileDraft.technical_skills || [])} onChange={(e) => setProfileDraft((current) => ({ ...current, skillsText: e.target.value }))} />
-        </label>
-        <label className="field">
-          Education
-          <small className="field-hint">One entry per line: <code>Degree | Institution | Dates</code></small>
-          <textarea rows={3} value={profileDraft.educationText ?? formatEducation(profileDraft.education || [])} onChange={(e) => setProfileDraft((current) => ({ ...current, educationText: e.target.value }))} />
-        </label>
+        <div className="field">
+          <div className="field-header">
+            <span>Work Experience</span>
+            <button className="add-link" type="button" onClick={() => setProfileDraft((c) => ({ ...c, experience: [...(c.experience || []), { company: "", title: "", dates: "", location: "", bullets: [""] }] }))}>+ Add Job</button>
+          </div>
+          <small className="field-hint">Fill the form fields. Each job has its own card; bullets can be added or removed individually.</small>
+          <div className="entry-list">
+            {(profileDraft.experience || []).map((job, jobIdx) => (
+              <div key={jobIdx} className="entry-card">
+                <div className="entry-card-grid">
+                  <input placeholder="Company" value={job.company || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, experience: c.experience.map((j, i) => i === jobIdx ? { ...j, company: e.target.value } : j) }))} />
+                  <input placeholder="Job Title" value={job.title || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, experience: c.experience.map((j, i) => i === jobIdx ? { ...j, title: e.target.value } : j) }))} />
+                  <input placeholder="Dates (e.g. May 2024 – Present)" value={job.dates || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, experience: c.experience.map((j, i) => i === jobIdx ? { ...j, dates: e.target.value } : j) }))} />
+                  <input placeholder="Location" value={job.location || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, experience: c.experience.map((j, i) => i === jobIdx ? { ...j, location: e.target.value } : j) }))} />
+                </div>
+                <div className="entry-bullets">
+                  {(job.bullets || []).map((bullet, bIdx) => (
+                    <div key={bIdx} className="bullet-row">
+                      <textarea
+                        rows={2}
+                        placeholder={`Bullet ${bIdx + 1}`}
+                        value={bullet || ""}
+                        onChange={(e) => setProfileDraft((c) => ({ ...c, experience: c.experience.map((j, i) => i === jobIdx ? { ...j, bullets: j.bullets.map((b, bi) => bi === bIdx ? e.target.value : b) } : j) }))}
+                      />
+                      <button className="icon-remove" type="button" title="Remove bullet" onClick={() => setProfileDraft((c) => ({ ...c, experience: c.experience.map((j, i) => i === jobIdx ? { ...j, bullets: j.bullets.filter((_, bi) => bi !== bIdx) } : j) }))}>×</button>
+                    </div>
+                  ))}
+                  <button className="add-link" type="button" onClick={() => setProfileDraft((c) => ({ ...c, experience: c.experience.map((j, i) => i === jobIdx ? { ...j, bullets: [...(j.bullets || []), ""] } : j) }))}>+ Add bullet</button>
+                </div>
+                <button className="secondary-button danger entry-remove" type="button" onClick={() => setProfileDraft((c) => ({ ...c, experience: c.experience.filter((_, i) => i !== jobIdx) }))}>Remove job</button>
+              </div>
+            ))}
+            {(profileDraft.experience || []).length === 0 && (
+              <div className="empty-hint">No jobs yet. Click <b>+ Add Job</b> to start.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="field">
+          <div className="field-header">
+            <span>Technical Skills</span>
+            <button className="add-link" type="button" onClick={() => setProfileDraft((c) => ({ ...c, technical_skills: [...(c.technical_skills || []), { category: "", items: "" }] }))}>+ Add Category</button>
+          </div>
+          <small className="field-hint">One row per category (e.g. <code>Backend Engineering</code>: <code>Node.js, FastAPI, Spring Boot</code>).</small>
+          <div className="entry-list">
+            {(profileDraft.technical_skills || []).map((skill, idx) => (
+              <div key={idx} className="entry-card compact">
+                <div className="entry-card-grid two">
+                  <input placeholder="Category" value={skill.category || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, technical_skills: c.technical_skills.map((s, i) => i === idx ? { ...s, category: e.target.value } : s) }))} />
+                  <input placeholder="Items (comma-separated)" value={skill.items || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, technical_skills: c.technical_skills.map((s, i) => i === idx ? { ...s, items: e.target.value } : s) }))} />
+                </div>
+                <button className="icon-remove" type="button" title="Remove" onClick={() => setProfileDraft((c) => ({ ...c, technical_skills: c.technical_skills.filter((_, i) => i !== idx) }))}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <div className="field-header">
+            <span>Education</span>
+            <button className="add-link" type="button" onClick={() => setProfileDraft((c) => ({ ...c, education: [...(c.education || []), { degree: "", institution: "", dates: "" }] }))}>+ Add Education</button>
+          </div>
+          <div className="entry-list">
+            {(profileDraft.education || []).map((edu, idx) => (
+              <div key={idx} className="entry-card compact">
+                <div className="entry-card-grid three">
+                  <input placeholder="Degree" value={edu.degree || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, education: c.education.map((x, i) => i === idx ? { ...x, degree: e.target.value } : x) }))} />
+                  <input placeholder="Institution" value={edu.institution || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, education: c.education.map((x, i) => i === idx ? { ...x, institution: e.target.value } : x) }))} />
+                  <input placeholder="Dates" value={edu.dates || ""} onChange={(e) => setProfileDraft((c) => ({ ...c, education: c.education.map((x, i) => i === idx ? { ...x, dates: e.target.value } : x) }))} />
+                </div>
+                <button className="icon-remove" type="button" title="Remove" onClick={() => setProfileDraft((c) => ({ ...c, education: c.education.filter((_, i) => i !== idx) }))}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
         <label className="field">
           Certifications
           <small className="field-hint">One certification per line.</small>

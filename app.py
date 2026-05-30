@@ -5,6 +5,7 @@ Modern Flask Resume Generator App
 - No AI needed, just template replacement
 """
 
+import copy
 import json
 import os
 import re
@@ -41,6 +42,7 @@ load_dotenv()
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 BASE_RESUME_PATH = resource_path("config", "base_resume.json")
+PROFILES_PATH = resource_path("config", "profiles.json")
 # Default to local resumes folder in project directory
 DEFAULT_OUTPUT_ROOT = str(default_output_dir())
 OUTPUT_ROOT = os.getenv("OUTPUT_ROOT", DEFAULT_OUTPUT_ROOT)
@@ -77,44 +79,78 @@ OPENAI_ANALYSIS_TIMEOUT_SECONDS = int(os.getenv("OPENAI_ANALYSIS_TIMEOUT_SECONDS
 OPENAI_RESUME_TIMEOUT_SECONDS = int(os.getenv("OPENAI_RESUME_TIMEOUT_SECONDS", "180"))
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 
-EXPERIENCE_BLUEPRINTS = [
+# Default blueprints — used only when base_resume.json has no experience
+# entries (e.g. a brand-new install). For an actual user, the live
+# blueprints are derived from base_resume.json by get_experience_blueprints()
+# so that edits to companies, dates, and locations flow into both the AI
+# prompts and the parser that reads the AI's reply back.
+DEFAULT_EXPERIENCE_BLUEPRINTS = [
     {
-        "key": "mckinsey",
-        "company": "McKinsey & Company",
-        "location": "CA, USA",
-        "dates": "May 2025 – Present",
-        "bullet_min": 6,
-        "bullet_max": 7,
-        "anchor": "enterprise delivery, applied AI workflows, ingestion and retrieval systems, customer-facing software",
-    },
-    {
-        "key": "uber",
-        "company": "Uber",
-        "location": "CA, USA",
-        "dates": "February 2024 – May 2025",
+        "key": "role_1",
+        "company": "Most Recent Company",
+        "location": "",
+        "dates": "Present",
         "bullet_min": 5,
         "bullet_max": 6,
-        "anchor": "operational tooling, transaction validation, real-time workflows, internal product systems",
-    },
-    {
-        "key": "kpmg",
-        "company": "KPMG",
-        "location": "India",
-        "dates": "September 2021 – July 2022",
-        "bullet_min": 5,
-        "bullet_max": 5,
-        "anchor": "audit and compliance systems, Java backend services, document processing, reporting workflows",
-    },
-    {
-        "key": "trigent",
-        "company": "Trigent Software",
-        "location": "India",
-        "dates": "March 2020 – August 2021",
-        "bullet_min": 3,
-        "bullet_max": 3,
-        "anchor": "frontend engineering, UI migration, responsive web delivery, QA-oriented implementation",
+        "anchor": "",
     },
 ]
+
+
+def _slugify_blueprint_key(name: str, used: set) -> str:
+    base = re.sub(r"[^a-z0-9]+", "_", (name or "").lower()).strip("_") or "role"
+    key = base
+    i = 2
+    while key in used:
+        key = f"{base}_{i}"
+        i += 1
+    return key
+
+
+def get_experience_blueprints() -> list[dict]:
+    """Build experience blueprints from the current base_resume.json.
+
+    Each editable entry in base_resume.experience is converted into a
+    blueprint with a stable slug key, the user's company/location/dates,
+    and bullet count derived from how many bullets are already saved.
+    """
+    try:
+        base_resume = load_base_resume()
+    except Exception:
+        return [dict(b) for b in DEFAULT_EXPERIENCE_BLUEPRINTS]
+
+    entries = base_resume.get("experience") or []
+    blueprints: list[dict] = []
+    used: set = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        company = str(entry.get("company", "")).strip()
+        if not company:
+            continue
+        bullet_count = len([b for b in (entry.get("bullets") or []) if str(b).strip()])
+        if bullet_count <= 0:
+            bullet_count = 5
+        key = _slugify_blueprint_key(company, used)
+        used.add(key)
+        blueprints.append({
+            "key": key,
+            "company": company,
+            "location": str(entry.get("location", "")).strip(),
+            "dates": str(entry.get("dates", "")).strip(),
+            "bullet_min": max(3, min(bullet_count, bullet_count - 1) if bullet_count > 3 else bullet_count),
+            "bullet_max": max(bullet_count, 3),
+            "anchor": str(entry.get("anchor", "")).strip(),
+        })
+    if not blueprints:
+        return [dict(b) for b in DEFAULT_EXPERIENCE_BLUEPRINTS]
+    return blueprints
+
+
+# Backwards-compatible alias for any leftover module-level references.
+# All hot paths call get_experience_blueprints() directly so edits to
+# base_resume.json are picked up on every request.
+EXPERIENCE_BLUEPRINTS = list(DEFAULT_EXPERIENCE_BLUEPRINTS)
 
 TITLE_WORD_MIN = 2
 TITLE_WORD_MAX = 8
@@ -1248,7 +1284,7 @@ def build_ai_analysis_prompt() -> str:
 
 def build_ai_resume_prompt() -> str:
     blueprint_lines = []
-    for blueprint in EXPERIENCE_BLUEPRINTS:
+    for blueprint in get_experience_blueprints():
         bullet_rule = f"{blueprint['bullet_min']}" if blueprint["bullet_min"] == blueprint["bullet_max"] else f"{blueprint['bullet_min']}-{blueprint['bullet_max']}"
         blueprint_lines.append(
             f"- {blueprint['company']} | {blueprint['location']} | {blueprint['dates']} | bullets: {bullet_rule} | anchor: {blueprint['anchor']}"
@@ -1710,7 +1746,7 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
 
 def build_ai_resume_experience_prompt(prompt_family_key: str = "software_engineering") -> str:
     blueprint_lines = []
-    for blueprint in EXPERIENCE_BLUEPRINTS:
+    for blueprint in get_experience_blueprints():
         bullet_rule = f"{blueprint['bullet_min']}" if blueprint["bullet_min"] == blueprint["bullet_max"] else f"{blueprint['bullet_min']}-{blueprint['bullet_max']}"
         blueprint_lines.append(
             f"- {blueprint['company']} | {blueprint['location']} | {blueprint['dates']} | bullets: {bullet_rule} | anchor: {blueprint['anchor']}"
@@ -2043,7 +2079,7 @@ def ai_resume_schema() -> dict:
     }
     experience_properties = {}
     required_experience_keys = []
-    for blueprint in EXPERIENCE_BLUEPRINTS:
+    for blueprint in get_experience_blueprints():
         experience_properties[blueprint["key"]] = {
             "type": "object",
             "additionalProperties": False,
@@ -2175,7 +2211,7 @@ def ai_skills_schema(allowed_skill_categories: list[str] | None = None) -> dict:
 def ai_experience_schema() -> dict:
     experience_properties = {}
     required_experience_keys = []
-    for blueprint in EXPERIENCE_BLUEPRINTS:
+    for blueprint in get_experience_blueprints():
         experience_properties[blueprint["key"]] = {
             "type": "object",
             "additionalProperties": False,
@@ -2496,7 +2532,7 @@ def format_generated_resume_text(resume_payload: dict) -> str:
 
     experience = resume_payload.get("experience", {})
     analysis_payload = resume_payload.get("_analysis") or {}
-    for blueprint in EXPERIENCE_BLUEPRINTS:
+    for blueprint in get_experience_blueprints():
         entry = experience.get(blueprint["key"], {})
         title, _ = resolve_experience_title(entry.get("title") or "", blueprint, analysis_payload)
         bullets = [bullet.strip() for bullet in entry.get("bullets", []) if bullet.strip()]
@@ -2575,7 +2611,7 @@ def merge_resume_payloads(core_payload: dict, experience_payload: dict) -> dict:
 def collect_experience_title_warnings(experience_payload: dict, analysis_payload: dict | None = None) -> list[str]:
     warnings: list[str] = []
     experience = experience_payload.get("experience") or {}
-    for blueprint in EXPERIENCE_BLUEPRINTS:
+    for blueprint in get_experience_blueprints():
         entry = experience.get(blueprint["key"]) or {}
         _, warning = resolve_experience_title(entry.get("title") or "", blueprint, analysis_payload)
         if warning:
@@ -2971,7 +3007,7 @@ def validate_model_payload(model_payload: dict) -> list[str]:
     if not analysis.get("target_role"):
         issues.append("Analysis is missing target_role.")
 
-    for blueprint in EXPERIENCE_BLUEPRINTS:
+    for blueprint in get_experience_blueprints():
         entry = experience.get(blueprint["key"]) or {}
         role_title = str(entry.get("title", "")).strip()
         bullets = [str(bullet).strip() for bullet in entry.get("bullets", []) if str(bullet).strip()]
@@ -3585,7 +3621,7 @@ def generate_resume_experience_from_analysis(
         )
 
     experience_payload = run_generation()
-    invalid_titles = collect_invalid_experience_titles(experience_payload, EXPERIENCE_BLUEPRINTS)
+    invalid_titles = collect_invalid_experience_titles(experience_payload, get_experience_blueprints())
     if invalid_titles:
         retry_lines = [
             "Previous attempt failed because one or more experience title fields were invalid.",
@@ -3602,7 +3638,7 @@ def generate_resume_experience_from_analysis(
 
     validation_issues = validate_experience_subset_payload_with_analysis(
         experience_payload,
-        EXPERIENCE_BLUEPRINTS,
+        get_experience_blueprints(),
         analysis_payload,
     )
     unsupported_tool_issues = [
@@ -3819,10 +3855,71 @@ def call_openai_resume_engine(
     return {"analysis": analysis_payload, "resume": parsed_resume, "timing": timing}
 
 
+def _empty_resume_template() -> dict:
+    return {
+        "name": "",
+        "title": "",
+        "contact": {"location": "", "phone": "", "email": ""},
+        "summary": "",
+        "technical_skills": [],
+        "experience": [],
+        "projects": [],
+        "education": [],
+        "certifications": [],
+    }
+
+
+def _read_legacy_base_resume() -> dict:
+    """Fallback to the original single-file resume during first-run migration."""
+    try:
+        with open(BASE_RESUME_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return _empty_resume_template()
+
+
+def load_profiles_store() -> dict:
+    """Load the multi-profile store, migrating on first run.
+
+    Shape: {"active": "Profile 1", "profiles": {"Profile 1": {<resume>}, ...}}
+    """
+    path = Path(PROFILES_PATH)
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if (
+                isinstance(data, dict)
+                and isinstance(data.get("profiles"), dict)
+                and data.get("active") in data["profiles"]
+            ):
+                return data
+        except Exception:
+            pass
+    # Seed from the legacy base_resume.json so existing setups are preserved.
+    seed = _read_legacy_base_resume()
+    store = {"active": "Profile 1", "profiles": {"Profile 1": seed}}
+    save_profiles_store(store)
+    return store
+
+
+def save_profiles_store(store: dict) -> None:
+    path = Path(PROFILES_PATH)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def get_active_profile_name() -> str:
+    return load_profiles_store().get("active") or "Profile 1"
+
+
 def load_base_resume():
-    """Load base resume template."""
-    with open(BASE_RESUME_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+    """Load the active profile's resume.
+
+    Backwards-compatible name — all existing call sites keep working and
+    automatically pick up whichever profile the user has selected.
+    """
+    store = load_profiles_store()
+    return copy.deepcopy(store["profiles"].get(store["active"], _empty_resume_template()))
 
 
 def safe_folder_name(title: str, output_root: str = None) -> str:
@@ -3968,9 +4065,11 @@ def apply_profile_overrides(resume: dict) -> dict:
 
 
 def save_base_resume(resume: dict) -> None:
-    """Persist the base resume template back to disk."""
-    with open(BASE_RESUME_PATH, "w", encoding="utf-8") as f:
-        json.dump(resume, f, indent=2, ensure_ascii=False)
+    """Persist edits back into the currently active profile."""
+    store = load_profiles_store()
+    name = store.get("active") or "Profile 1"
+    store["profiles"][name] = resume
+    save_profiles_store(store)
 
 
 def normalize_experience_entries(entries) -> list[dict]:
@@ -4300,6 +4399,90 @@ def update_profile():
         if e.analysis and 'session' in locals():
             session["analysis"] = e.analysis
         return jsonify(response), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+def _profiles_summary(store: dict) -> dict:
+    return {"active": store.get("active"), "profiles": sorted(store["profiles"].keys())}
+
+
+@app.route("/api/profiles", methods=["GET"])
+def list_profiles():
+    return jsonify(_profiles_summary(load_profiles_store()))
+
+
+@app.route("/api/profiles", methods=["POST"])
+def create_profile():
+    try:
+        data = request.get_json() or {}
+        name = str(data.get("name", "")).strip()
+        copy_from = str(data.get("copy_from", "")).strip()
+        if not name:
+            return jsonify({"success": False, "error": "Profile name required"}), 400
+        store = load_profiles_store()
+        if name in store["profiles"]:
+            return jsonify({"success": False, "error": "Profile already exists"}), 400
+        seed = store["profiles"].get(copy_from) if copy_from else None
+        store["profiles"][name] = copy.deepcopy(seed) if seed else _empty_resume_template()
+        # Newly-created profile becomes active so the user can start editing it.
+        store["active"] = name
+        save_profiles_store(store)
+        return jsonify({"success": True, **_profiles_summary(store)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/profiles/active", methods=["POST"])
+def set_active_profile_route():
+    try:
+        data = request.get_json() or {}
+        name = str(data.get("name", "")).strip()
+        store = load_profiles_store()
+        if name not in store["profiles"]:
+            return jsonify({"success": False, "error": "Unknown profile"}), 404
+        store["active"] = name
+        save_profiles_store(store)
+        return jsonify({"success": True, **_profiles_summary(store)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/profiles/<name>/rename", methods=["POST"])
+def rename_profile(name):
+    try:
+        data = request.get_json() or {}
+        new_name = str(data.get("name", "")).strip()
+        if not new_name:
+            return jsonify({"success": False, "error": "New name required"}), 400
+        store = load_profiles_store()
+        if name not in store["profiles"]:
+            return jsonify({"success": False, "error": "Unknown profile"}), 404
+        if new_name != name and new_name in store["profiles"]:
+            return jsonify({"success": False, "error": "Profile already exists"}), 400
+        if new_name != name:
+            store["profiles"][new_name] = store["profiles"].pop(name)
+            if store["active"] == name:
+                store["active"] = new_name
+            save_profiles_store(store)
+        return jsonify({"success": True, **_profiles_summary(store)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/profiles/<name>", methods=["DELETE"])
+def delete_profile(name):
+    try:
+        store = load_profiles_store()
+        if name not in store["profiles"]:
+            return jsonify({"success": False, "error": "Unknown profile"}), 404
+        if len(store["profiles"]) <= 1:
+            return jsonify({"success": False, "error": "Cannot delete the last profile"}), 400
+        del store["profiles"][name]
+        if store["active"] == name:
+            store["active"] = sorted(store["profiles"].keys())[0]
+        save_profiles_store(store)
+        return jsonify({"success": True, **_profiles_summary(store)})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
@@ -4972,7 +5155,11 @@ def _generate_ai_experience_subset(*, recent: bool):
 
         core_payload = merge_core_sections(title_summary, skills_payload)
         core_payload["_analysis"] = analysis_payload
-        blueprints = EXPERIENCE_BLUEPRINTS[:2] if recent else EXPERIENCE_BLUEPRINTS[2:]
+        all_blueprints = get_experience_blueprints()
+        # Split point: first two roles are "recent", the rest are "older".
+        # If a user has <=2 roles, "older" pass is empty and harmless.
+        split = min(2, len(all_blueprints))
+        blueprints = all_blueprints[:split] if recent else all_blueprints[split:]
         model = RESUME_MODEL
         timeout_seconds = OPENAI_RESUME_TIMEOUT_SECONDS
 

@@ -4,30 +4,30 @@ import copy
 import re
 from typing import Any
 
-# Hardcoded company data - company name, location, and dates never change
-# Titles and bullets will be parsed from user input
-COMPANIES = [
-    {
-        "company": "McKinsey & Company",
-        "location": "CA, USA",
-        "dates": "May 2025 – Present",
-    },
-    {
-        "company": "Uber",
-        "location": "CA, USA",
-        "dates": "February 2024 – May 2025",
-    },
-    {
-        "company": "KPMG",
-        "location": "India",
-        "dates": "September 2021 – July 2022",
-    },
-    {
-        "company": "Trigent Software",
-        "location": "India",
-        "dates": "March 2020 – August 2021",
-    },
-]
+# Companies are now derived from the live base_resume passed into
+# parse_updated_content_to_resume(); see _companies_from_base_resume().
+# The previous hardcoded COMPANIES list has been removed so edits made
+# through the UI profile editor flow through correctly.
+
+
+def _companies_from_base_resume(base_resume: dict | None) -> list[dict]:
+    """Build the list of {company, location, dates} from the user's
+    saved base_resume profile. Empty entries are skipped."""
+    if not isinstance(base_resume, dict):
+        return []
+    out: list[dict] = []
+    for entry in base_resume.get("experience") or []:
+        if not isinstance(entry, dict):
+            continue
+        company = str(entry.get("company", "")).strip()
+        if not company:
+            continue
+        out.append({
+            "company": company,
+            "location": str(entry.get("location", "")).strip(),
+            "dates": str(entry.get("dates", "")).strip(),
+        })
+    return out
 
 
 def _clean_bullet(line: str) -> str:
@@ -127,14 +127,14 @@ def _clean_title(title: str) -> str:
     return title.strip()
 
 
-def _parse_experience_titles_and_bullets(text: str) -> dict[str, dict[str, Any]]:
+def _parse_experience_titles_and_bullets(text: str, companies: list[dict]) -> dict[str, dict[str, Any]]:
     """
     Search for each company name in text and extract title and bullets after it.
     Returns dict mapping company name -> {title, bullets}.
     """
     result: dict[str, dict[str, Any]] = {}
 
-    for i, company_info in enumerate(COMPANIES):
+    for i, company_info in enumerate(companies):
         company_name = company_info["company"]
 
         # Search for company name at start of line (flexible - allows pipes after)
@@ -153,7 +153,7 @@ def _parse_experience_titles_and_bullets(text: str) -> dict[str, dict[str, Any]]
         next_company_idx = len(text)  # Default to end of text
 
         # Find the next company mention (also at start of line)
-        for other_company in COMPANIES[i + 1 :]:
+        for other_company in companies[i + 1 :]:
             other_pattern = r'(?:^|\n)\s*' + re.escape(other_company["company"]) + r'(?:\s|$|[\|\-])'
             other_match = re.search(other_pattern, text[section_start:], re.IGNORECASE)
             if other_match:
@@ -239,9 +239,11 @@ def parse_updated_content_to_resume(updated_text: str, base_resume: dict) -> dic
     if not exp_text:
         exp_text = _between(text, "MODIFIED EXPERIENCE", None)
 
-    # Parse sections
+    # Parse sections — companies come from the user's saved base_resume so
+    # edits to company names/dates flow through correctly.
+    companies = _companies_from_base_resume(base_resume)
     skills = _parse_skills(skills_text) if skills_text else []
-    company_data = _parse_experience_titles_and_bullets(exp_text) if exp_text else {}
+    company_data = _parse_experience_titles_and_bullets(exp_text, companies) if exp_text else {}
 
     # Update resume
     if title:
