@@ -253,6 +253,17 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "Testing & Quality",
         "Tools & Platforms",
     ],
+    "agentic_ai_engineering": [
+        "Programming Languages",
+        "AI & LLM Systems",
+        "Data & Storage",
+        "Tools & Platforms",
+        "Backend Engineering",
+        "Messaging & Streaming",
+        "Security & Auth",
+        "Observability & Reliability",
+        "Cloud & Infrastructure",
+    ],
     "solutions_engineering": [
         "Programming Languages",
         "Backend Engineering",
@@ -358,6 +369,12 @@ ROLE_FAMILY_TO_SKILL_ORDER_KEY = {
     "embedded systems engineering": "embedded_systems",
     "system software engineering": "embedded_systems",
     "ai application engineering": "ai_application",
+    "agentic ai engineering": "agentic_ai_engineering",
+    "ai agent engineering": "agentic_ai_engineering",
+    "agent engineering": "agentic_ai_engineering",
+    "agentic engineering": "agentic_ai_engineering",
+    "agent infrastructure engineering": "agentic_ai_engineering",
+    "llm agent engineering": "agentic_ai_engineering",
     "solutions engineering": "solutions_engineering",
     "implementation engineering": "solutions_engineering",
     "security engineering": "security_engineering",
@@ -413,6 +430,12 @@ ROLE_FAMILY_TO_PROMPT_FAMILY_KEY = {
     "embedded systems engineering": "platform_systems",
     "system software engineering": "platform_systems",
     "ai application engineering": "software_engineering",
+    "agentic ai engineering": "agentic_ai_engineering",
+    "ai agent engineering": "agentic_ai_engineering",
+    "agent engineering": "agentic_ai_engineering",
+    "agentic engineering": "agentic_ai_engineering",
+    "agent infrastructure engineering": "agentic_ai_engineering",
+    "llm agent engineering": "agentic_ai_engineering",
     "solutions engineering": "solutions_customer",
     "implementation engineering": "solutions_customer",
     "security engineering": "security_engineering",
@@ -485,6 +508,20 @@ SKILL_GENERIC_PHRASES = {
     "dashboarding",
 }
 
+SKILL_HARD_BLOCKED_PHRASES = {
+    "workflow engines",
+    "automated pipelines",
+    "distributed systems",
+    "multi agent systems",
+    "multi-agent systems",
+    "programmable governance logic",
+    "governance frameworks",
+    "agent orchestration",
+    "agent communication",
+    "communication standards",
+    "autonomous agents",
+}
+
 SKILL_CATEGORY_PATTERNS = {
     "Programming Languages": (
         "python", "java", "javascript", "typescript", "sql", "pl-sql", "oracle sql", "c#", "c++", "go", "rust", "scala",
@@ -500,6 +537,8 @@ SKILL_CATEGORY_PATTERNS = {
     "Data & Storage": (
         "snowflake", "oracle", "oracle sql", "oracle pl-sql", "postgres", "postgresql", "mysql", "sql server", "redis",
         "mongodb", "schema", "partition", "query", "warehouse", "data modeling", "index", "materialized view",
+        "pinecone", "weaviate", "chroma", "faiss", "pgvector", "milvus", "qdrant", "elasticsearch", "opensearch",
+        "vector database", "vector store", "embedding store", "memory store", "bigquery",
     ),
     "Cloud & Infrastructure": (
         "aws", "gcp", "azure", "google cloud", "docker", "kubernetes", "terraform", "terragrunt", "pulumi", "helm",
@@ -523,7 +562,9 @@ SKILL_CATEGORY_PATTERNS = {
     ),
     "AI & LLM Systems": (
         "claude", "anthropic", "openai", "llm", "rag", "prompt", "agent", "agentic", "embedding", "vector", "semantic",
-        "model integration", "inference",
+        "model integration", "inference", "mcp", "model context protocol", "tool calling", "function calling",
+        "langchain", "langgraph", "crewai", "autogen", "semantic kernel", "llamaindex", "guardrails", "langsmith",
+        "langfuse", "helicone", "openai api", "anthropic api", "claude api", "agents sdk", "a2a", "agent-to-agent",
     ),
     "Data Engineering": (
         "pyspark", "spark", "etl", "elt", "airflow", "orchestration", "data pipeline", "data ingestion", "batch", "stream",
@@ -1070,7 +1111,10 @@ def normalize_analysis_payload(analysis_payload: dict) -> dict:
     target_role = str(normalized.get("target_role", "")).strip().lower()
     skills_mentioned = [str(item).strip().lower() for item in (normalized.get("skills_mentioned") or []) if str(item).strip()]
     responsibilities = [str(item).strip().lower() for item in (normalized.get("responsibilities") or []) if str(item).strip()]
-    combined_signals = " ".join([role_family_lower, target_role, *skills_mentioned, *responsibilities])
+    workflows = [str(item).strip().lower() for item in (normalized.get("workflows") or []) if str(item).strip()]
+    system_description = str(normalized.get("system_description", "")).strip().lower()
+    core_problem = str(normalized.get("core_problem", "")).strip().lower()
+    combined_signals = " ".join([role_family_lower, target_role, system_description, core_problem, *skills_mentioned, *responsibilities, *workflows])
 
     customer_facing_markers = (
         "demo", "onboarding", "customer support", "adoption", "pre-sales", "presales",
@@ -1084,8 +1128,18 @@ def normalize_analysis_payload(analysis_payload: dict) -> dict:
 
     looks_customer_facing = any(marker in combined_signals for marker in customer_facing_markers)
     looks_backend_integration = any(marker in combined_signals for marker in backend_integration_markers)
+    agentic_markers = (
+        "agentic", "ai agent", "agent engineer", "autonomous agent", "agent orchestration", "agent-to-agent",
+        "model context protocol", " mcp", "tool calling", "function calling", "llm api", "openai", "anthropic",
+        "langchain", "langgraph", "agent framework", "programmable governance", "agent governance"
+    )
+    looks_agentic_ai = any(marker in combined_signals for marker in agentic_markers)
 
-    if (
+    if looks_agentic_ai:
+        normalized["role_family"] = "agentic AI engineering"
+        normalized["prompt_family_key"] = "agentic_ai_engineering"
+        normalized["skill_category_order_key"] = "agentic_ai_engineering"
+    elif (
         normalized.get("prompt_family_key") == "solutions_customer"
         and "integration" in combined_signals
         and looks_backend_integration
@@ -1172,10 +1226,64 @@ def skill_item_is_blocked_generic_phrase(item: str, analysis_payload: dict) -> b
     key = normalize_skill_dedupe_key(item)
     if not key:
         return False
+    hard_blocked = {normalize_skill_dedupe_key(phrase) for phrase in SKILL_HARD_BLOCKED_PHRASES}
+    if key in hard_blocked:
+        return True
     jd_terms = {normalize_skill_dedupe_key(term) for term in (analysis_payload.get("skills_mentioned") or [])}
     if key in jd_terms:
         return False
     return key in {normalize_skill_dedupe_key(phrase) for phrase in SKILL_GENERIC_PHRASES}
+
+
+def skill_item_category_issue(category: str, item: str) -> str | None:
+    category_key = str(category or "").strip()
+    item_key = normalize_skill_dedupe_key(item)
+    if not category_key or not item_key:
+        return None
+    misplaced_by_category = {
+        "Cloud & Infrastructure": {
+            "grpc": "Backend Engineering or Messaging & Streaming",
+            "websockets": "Backend Engineering or Messaging & Streaming",
+            "websocket": "Backend Engineering or Messaging & Streaming",
+            "kafka": "Messaging & Streaming",
+            "rabbitmq": "Messaging & Streaming",
+            "mcp": "AI & LLM Systems",
+            "model context protocol": "AI & LLM Systems",
+            "langchain": "AI & LLM Systems",
+            "langgraph": "AI & LLM Systems",
+        },
+        "Backend Engineering": {
+            "distributed systems": "Tools & Platforms, Messaging & Streaming, or a concrete framework",
+            "multi agent systems": "AI & LLM Systems",
+            "multi-agent systems": "AI & LLM Systems",
+        },
+        "Security & Auth": {
+            "programmable governance logic": "Tools & Platforms",
+            "governance frameworks": "Tools & Platforms",
+        },
+    }
+    replacement_category = misplaced_by_category.get(category_key, {}).get(item_key)
+    if not replacement_category:
+        return None
+    return f"Skill item '{item}' belongs under {replacement_category}, not '{category_key}'."
+
+
+def validate_agentic_data_storage(skills: list[dict], analysis_payload: dict) -> list[str]:
+    if str(analysis_payload.get("prompt_family_key", "")).strip() != "agentic_ai_engineering":
+        return []
+    data_items = [
+        normalize_skill_dedupe_key(item)
+        for entry in skills
+        if str(entry.get("category", "")).strip() == "Data & Storage"
+        for item in expand_skill_items(entry.get("items", []))
+    ]
+    vector_store_terms = {
+        "pinecone", "weaviate", "chroma", "faiss", "pgvector", "milvus", "qdrant",
+        "vector database", "vector store", "embedding store"
+    }
+    if any(any(term in item for term in vector_store_terms) for item in data_items):
+        return []
+    return ["Agentic AI skills should include at least one vector store or embedding store in Data & Storage."]
 
 
 def expand_skill_items(raw_items: list) -> list[str]:
@@ -1245,6 +1353,8 @@ def infer_skill_category_order_key(role_family: str) -> str:
         return "backend_application"
     if "gtm" in family or "go-to-market" in family or "go to market" in family or "revops" in family or "revenue engineering" in family:
         return "gtm_engineering"
+    if "agent" in family or "agentic" in family or "llm agent" in family:
+        return "agentic_ai_engineering"
     if "security" in family or "cybersecurity" in family or "application security" in family or "cloud security" in family:
         return "security_engineering"
     if "data" in family or "analytics" in family:
@@ -1281,6 +1391,8 @@ def infer_prompt_family_key(role_family: str) -> str:
         return "software_engineering"
     if "gtm" in family or "go-to-market" in family or "go to market" in family or "revops" in family or "revenue engineering" in family:
         return "gtm_engineering"
+    if "agent" in family or "agentic" in family or "llm agent" in family:
+        return "agentic_ai_engineering"
     if "marketing analyst" in family:
         return "analyst_marketing"
     if "business analyst" in family or "operations analyst" in family:
@@ -1324,13 +1436,14 @@ def build_ai_analysis_prompt() -> str:
             "Do not mirror the JD or invent unsupported domain expertise.",
             "Infer the company context, role family, problem, system, skills and technologies mentioned, and behavioral signals.",
             "Role family must describe the actual job shape, not a generic software-engineer label.",
-            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, security engineering, application security engineering, cloud security engineering, solutions engineering, implementation engineering, AI application engineering, data analyst, business analyst, marketing analyst, product analyst, operations analyst, or GTM engineering.",
-            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, platform_distributed, embedded_systems, ai_application, security_engineering, solutions_engineering, analyst_data, analyst_business, analyst_marketing, gtm_engineering.",
+            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, security engineering, application security engineering, cloud security engineering, solutions engineering, implementation engineering, AI application engineering, agentic AI engineering, AI agent engineering, data analyst, business analyst, marketing analyst, product analyst, operations analyst, or GTM engineering.",
+            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, platform_distributed, embedded_systems, ai_application, agentic_ai_engineering, security_engineering, solutions_engineering, analyst_data, analyst_business, analyst_marketing, gtm_engineering.",
             "Pick the skill_category_order_key that best fits the role family and technical center of the JD.",
-            "Choose exactly one prompt_family_key from this fixed set: software_engineering, data_engineering, platform_systems, security_engineering, analyst_data, analyst_business, analyst_marketing, solutions_customer, gtm_engineering.",
+            "Choose exactly one prompt_family_key from this fixed set: software_engineering, data_engineering, platform_systems, agentic_ai_engineering, security_engineering, analyst_data, analyst_business, analyst_marketing, solutions_customer, gtm_engineering.",
             "Pick the prompt_family_key that best matches the role family and what the later prompts should optimize for.",
             "If the JD centers on SQL, PySpark, Snowflake, ETL, orchestration, dashboards, or data quality, classify it as data engineering or analytics engineering rather than generic software engineering.",
             "If the JD centers on Rust, Linux, concurrency, networking, security platforms, or low-level services, classify it as platform engineering or distributed systems engineering rather than generic full-stack work.",
+            "If the JD centers on AI agents, agent orchestration, agent-to-agent communication, autonomous agents, tool calling, function calling, MCP, Model Context Protocol, agent governance, programmable policy for agents, LLM APIs, OpenAI, Anthropic, LangChain, LangGraph, or agent frameworks, classify it as agentic AI engineering rather than distributed systems or backend engineering.",
             "If the JD centers on reporting, dashboards, SQL analysis, business insights, stakeholder support, campaign measurement, attribution, funnel metrics, requirements gathering, or KPI analysis, classify it as an analyst family rather than software engineering.",
             "If the JD is about building internal or product-side integrations across APIs, cloud services, microservices, authentication, event-driven systems, CI/CD, DevOps, or backend services, classify it as backend application engineering or cloud integration engineering rather than solutions engineering.",
             "Reserve solutions engineering and implementation engineering for clearly customer-facing roles such as demos, onboarding, external implementations, technical account support, pre-sales, sales engineering, or customer adoption work.",
@@ -1651,6 +1764,11 @@ def build_ai_resume_title_summary_prompt(prompt_family_key: str = "software_engi
             "- mention frontend work only as supporting capability for data users when relevant",
             "- keep the summary focused on data systems and operational outcomes rather than generic software engineering language",
         ],
+        "agentic_ai_engineering": [
+            "- emphasize AI-agent infrastructure, agent orchestration, tool protocols, LLM APIs, governance, policy controls, and production reliability",
+            "- surface MCP, tool calling, function calling, OpenAI, Anthropic, LangChain, LangGraph, vector stores, evals, tracing, and policy/governance tools when grounded in the JD",
+            "- frame the role as agentic AI infrastructure rather than generic distributed systems or backend engineering",
+        ],
         "platform_systems": [
             "- emphasize scale, reliability, APIs, observability, and system performance",
             "- prioritize platform constraints, architecture tradeoffs, and resilient delivery over product UI language",
@@ -1735,6 +1853,17 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
         "data_engineering": [
             "- prioritize named data tools, databases, warehouses, orchestration tools, BI tools, SQL, Python, PySpark, and cloud data services",
             "- keep generic data capabilities out of skills unless they are named directly in the JD",
+        ],
+        "agentic_ai_engineering": [
+            "- prioritize agent infrastructure and LLM stack: MCP, Model Context Protocol, tool calling, function calling, OpenAI API, Anthropic API, LangChain, LangGraph, AutoGen, CrewAI, Semantic Kernel, LlamaIndex, Agents SDK",
+            "- include enterprise agent governance and observability tools when relevant: Open Policy Agent, Guardrails, LangSmith, Langfuse, Helicone, OpenTelemetry, MLflow, Weights & Biases",
+            "- Data & Storage should include agent memory and vector-store databases when relevant: Pinecone, Weaviate, Chroma, FAISS, pgvector, Milvus, Qdrant, Redis, PostgreSQL, MongoDB, BigQuery",
+            "- for agent orchestration or RAG-style roles, include at least one concrete vector or memory store in Data & Storage when it fits the JD context",
+            "- include communication and orchestration infrastructure when relevant: Kafka, RabbitMQ, Temporal, gRPC, WebSockets, Kubernetes",
+            "- replace placeholder phrases with concrete tools: use Temporal or Airflow instead of Workflow engines; LangGraph, AutoGen, CrewAI, or Semantic Kernel instead of Multi-agent systems; Open Policy Agent or Guardrails instead of Governance frameworks",
+            "- never output placeholder skills such as Workflow engines, Automated pipelines, Distributed systems, Multi-agent systems, Programmable governance logic, Governance frameworks, Agent orchestration, or Communication standards",
+            "- put gRPC and WebSockets under Backend Engineering or Messaging & Streaming, not Cloud & Infrastructure",
+            "- do not collapse agentic AI roles into generic Backend Engineering, System Design, or distributed-systems phrases",
         ],
         "platform_systems": [
             "- prioritize named infrastructure, observability, security, networking, operating-system, cloud, and deployment tools",
@@ -1828,6 +1957,11 @@ def build_ai_resume_experience_prompt(prompt_family_key: str = "software_enginee
         "data_engineering": [
             "- recent roles should highlight pipelines, warehousing, orchestration, data quality, reporting data flows, and measurable operational improvement",
             "- describe systems and workflows in data terms rather than generic product-engineering language",
+        ],
+        "agentic_ai_engineering": [
+            "- recent roles should highlight agent orchestration, LLM API integration, tool execution, governance controls, retrieval or memory, evals, tracing, and production reliability",
+            "- use agentic AI infrastructure framing rather than generic backend or distributed-systems framing",
+            "- do not introduce MCP, agent frameworks, vector databases, or governance tools unless they appear in the JD or selected skills",
         ],
         "platform_systems": [
             "- recent roles should highlight scale, observability, reliability, infrastructure, and performance tradeoffs",
@@ -1942,6 +2076,11 @@ def build_ai_resume_experience_subset_prompt(blueprints: list[dict], prompt_fami
         "data_engineering": [
             "- selected skills should guide the stack used in bullets; prioritize SQL, pipelines, warehousing, orchestration, and data-quality workflows",
             "- describe systems and impacts in data workflow terms",
+        ],
+        "agentic_ai_engineering": [
+            "- selected skills should guide the stack used in bullets; prioritize agent orchestration, LLM APIs, MCP or tool protocols, governance controls, retrieval or memory, evals, tracing, and production reliability",
+            "- use agentic AI infrastructure framing rather than generic backend or distributed-systems framing",
+            "- do not introduce MCP, agent frameworks, vector databases, or governance tools unless they appear in the JD or selected skills",
         ],
         "platform_systems": [
             "- selected skills should guide the stack used in bullets; prioritize infrastructure, reliability, observability, scale, and system tradeoffs",
@@ -2119,7 +2258,7 @@ def ai_analysis_schema() -> dict:
             "target_role": {"type": "string"},
             "role_family": {"type": "string"},
             "skill_category_order_key": {"type": "string", "enum": sorted(SKILL_CATEGORY_ORDER_TEMPLATES.keys())},
-            "prompt_family_key": {"type": "string", "enum": ["software_engineering", "data_engineering", "platform_systems", "security_engineering", "analyst_data", "analyst_business", "analyst_marketing", "solutions_customer", "gtm_engineering"]},
+            "prompt_family_key": {"type": "string", "enum": ["software_engineering", "data_engineering", "platform_systems", "agentic_ai_engineering", "security_engineering", "analyst_data", "analyst_business", "analyst_marketing", "solutions_customer", "gtm_engineering"]},
             "core_problem": {"type": "string"},
             "hire_problem": {"type": "string"},
             "desired_outcomes": {"type": "array", "items": {"type": "string"}},
@@ -2429,6 +2568,12 @@ DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY = {
         "mckinsey": "Data Engineer",
         "uber": "Data Engineer",
         "kpmg": "Java Full Stack Developer",
+        "trigent": "Frontend Developer",
+    },
+    "agentic_ai_engineering": {
+        "mckinsey": "AI Agent Engineer",
+        "uber": "AI Platform Engineer",
+        "kpmg": "Software Engineer",
         "trigent": "Frontend Developer",
     },
     "platform_systems": {
@@ -3082,10 +3227,14 @@ def validate_model_payload(model_payload: dict) -> list[str]:
                 issues.append(
                     f"Skill item '{item}' in '{category}' is too generic; use a named JD tool or related enterprise tool instead."
                 )
+            category_issue = skill_item_category_issue(category, item)
+            if category_issue:
+                issues.append(category_issue)
             all_skill_items.append(item.lower())
 
     if len(set(all_skill_items)) < max(len(all_skill_items) - 3, 1):
         issues.append("Updated skills repeat too many items across categories.")
+    issues.extend(validate_agentic_data_storage(skills, analysis))
 
     if jd_terms:
         matched_skill_terms = 0
@@ -3192,6 +3341,7 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
 
     if len(skills) < 6:
         issues.append("Updated skills must contain at least 6 categories.")
+    issues.extend(validate_agentic_data_storage(skills, analysis_payload))
 
     seen_categories: set[str] = set()
     for entry in skills:
@@ -3216,6 +3366,9 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
                 issues.append(
                     f"Skill item '{item}' in '{category}' is too generic; use a named JD tool or related enterprise tool instead."
                 )
+            category_issue = skill_item_category_issue(category, item)
+            if category_issue:
+                issues.append(category_issue)
             if is_analyst_prompt_family(analysis_payload):
                 unsupported_tool = analyst_tool_not_in_jd(item, analysis_payload)
                 if unsupported_tool:
@@ -3282,6 +3435,7 @@ def validate_skills_only_payload(skills_payload: dict, analysis_payload: dict) -
     skills = normalize_updated_skills(skills_payload.get("updated_skills") or [])
     if len(skills) < 6:
         issues.append("Updated skills must contain at least 6 categories.")
+    issues.extend(validate_agentic_data_storage(skills, analysis_payload))
     seen_categories: set[str] = set()
     for entry in skills:
         category = str(entry.get("category", "")).strip()
@@ -3301,6 +3455,9 @@ def validate_skills_only_payload(skills_payload: dict, analysis_payload: dict) -
                 issues.append(
                     f"Skill item '{item}' in '{category}' is too generic; use a named JD tool or related enterprise tool instead."
                 )
+            category_issue = skill_item_category_issue(category, item)
+            if category_issue:
+                issues.append(category_issue)
             if is_analyst_prompt_family(analysis_payload):
                 unsupported_tool = analyst_tool_not_in_jd(item, analysis_payload)
                 if unsupported_tool:
@@ -3610,13 +3767,23 @@ def generate_skills_from_analysis(
         issue for issue in skill_issues
         if "is too generic; use a named JD tool or related enterprise tool instead" in issue
     ]
-    retryable_skill_issues = unsupported_tool_issues + generic_skill_issues
+    category_skill_issues = [
+        issue for issue in skill_issues
+        if "belongs under" in issue
+    ]
+    agentic_data_issues = [
+        issue for issue in skill_issues
+        if "vector store or embedding store" in issue
+    ]
+    retryable_skill_issues = unsupported_tool_issues + generic_skill_issues + category_skill_issues + agentic_data_issues
     if retryable_skill_issues:
         retry_lines = [
             "Previous attempt used unsupported tools or generic skill phrases.",
             "Replace unsupported vendor names with JD-grounded tools or closely related enterprise tools.",
             "Do not replace unsupported vendor names with generic capability labels or process phrases.",
             "Remove generic skill phrases and use named tools, platforms, languages, frameworks, databases, cloud services, or enterprise systems.",
+            "Fix category placement issues by moving the item to the right category or replacing it with a concrete tool that fits the current category.",
+            "For agentic AI roles, Data & Storage must include a concrete vector or embedding store such as Pinecone, Weaviate, Chroma, FAISS, pgvector, Milvus, or Qdrant when relevant.",
             "If the JD does not mention a named tool for Tools & Platforms, use related enterprise platforms only when they fit the JD context, otherwise keep the category smaller.",
             "Fix these exact issues:",
             *[f"- {issue}" for issue in retryable_skill_issues],
