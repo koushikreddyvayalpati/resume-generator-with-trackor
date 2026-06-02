@@ -173,6 +173,7 @@ ALLOWED_SKILL_CATEGORIES = {
     "Embedded Systems",
     "Messaging & Streaming",
     "Security & Auth",
+    "Compliance & Frameworks",
     "Data Analysis & Querying",
     "BI & Visualization",
     "Reporting & Insights",
@@ -197,7 +198,7 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "DevOps & CI/CD",
         "Testing & Quality",
         "AI & LLM Systems",
-        "System Design & Performance",
+        "Tools & Platforms",
     ],
     "backend_application": [
         "Programming Languages",
@@ -207,7 +208,7 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "Observability & Reliability",
         "DevOps & CI/CD",
         "Testing & Quality",
-        "System Design & Performance",
+        "Messaging & Streaming",
         "Security & Auth",
     ],
     "data_engineering": [
@@ -219,7 +220,7 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "DevOps & CI/CD",
         "Testing & Quality",
         "AI & LLM Systems",
-        "System Design & Performance",
+        "BI & Visualization",
     ],
     "platform_distributed": [
         "Programming Languages",
@@ -229,7 +230,7 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "Observability & Reliability",
         "DevOps & CI/CD",
         "Testing & Quality",
-        "System Design & Performance",
+        "Tools & Platforms",
         "Security & Auth",
     ],
     "embedded_systems": [
@@ -238,7 +239,7 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "Backend Engineering",
         "Observability & Reliability",
         "Testing & Quality",
-        "System Design & Performance",
+        "Tools & Platforms",
         "Security & Auth",
     ],
     "ai_application": [
@@ -250,7 +251,7 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "Cloud & Infrastructure",
         "DevOps & CI/CD",
         "Testing & Quality",
-        "System Design & Performance",
+        "Tools & Platforms",
     ],
     "solutions_engineering": [
         "Programming Languages",
@@ -259,35 +260,44 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "Data & Storage",
         "Cloud & Infrastructure",
         "Testing & Quality",
-        "System Design & Performance",
+        "Tools & Platforms",
         "AI & LLM Systems",
+    ],
+    "security_engineering": [
+        "Security & Auth",
+        "Compliance & Frameworks",
+        "Cloud & Infrastructure",
+        "Observability & Reliability",
+        "DevOps & CI/CD",
+        "Tools & Platforms",
+        "Programming Languages",
+        "Data & Storage",
     ],
     "analyst_data": [
         "Programming Languages",
         "Data Analysis & Querying",
         "BI & Visualization",
         "Data & Storage",
-        "Reporting & Insights",
-        "Experimentation & Measurement",
-        "Stakeholder Communication",
+        "CRM & RevOps Platforms",
+        "Cloud & Infrastructure",
         "Tools & Platforms",
     ],
     "analyst_business": [
-        "Business Analysis",
+        "Programming Languages",
         "Data Analysis & Querying",
         "BI & Visualization",
-        "Process & Requirements",
-        "Reporting & Insights",
-        "Stakeholder Communication",
+        "Data & Storage",
+        "CRM & RevOps Platforms",
+        "Cloud & Infrastructure",
         "Tools & Platforms",
     ],
     "analyst_marketing": [
+        "Programming Languages",
         "Marketing Analytics",
         "Data Analysis & Querying",
         "BI & Visualization",
-        "Experimentation & Measurement",
-        "Reporting & Insights",
-        "Stakeholder Communication",
+        "CRM & RevOps Platforms",
+        "Outbound & Lifecycle Tooling",
         "Tools & Platforms",
     ],
     "gtm_engineering": [
@@ -296,8 +306,8 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "CRM & RevOps Platforms",
         "Data Analysis & Querying",
         "Outbound & Lifecycle Tooling",
-        "Reporting & Insights",
-        "Stakeholder Communication",
+        "BI & Visualization",
+        "Data & Storage",
         "AI & LLM Systems",
         "Tools & Platforms",
     ],
@@ -313,6 +323,7 @@ PREFERRED_SKILL_CATEGORY_ORDER = [
     "Observability & Reliability",
     "DevOps & CI/CD",
     "Security & Auth",
+    "Compliance & Frameworks",
     "Testing & Quality",
     "System Design & Performance",
     "AI & LLM Systems",
@@ -349,6 +360,12 @@ ROLE_FAMILY_TO_SKILL_ORDER_KEY = {
     "ai application engineering": "ai_application",
     "solutions engineering": "solutions_engineering",
     "implementation engineering": "solutions_engineering",
+    "security engineering": "security_engineering",
+    "application security engineering": "security_engineering",
+    "cloud security engineering": "security_engineering",
+    "product security engineering": "security_engineering",
+    "cybersecurity engineering": "security_engineering",
+    "security analyst": "security_engineering",
     "data analyst": "analyst_data",
     "data analytics": "analyst_data",
     "business analyst": "analyst_business",
@@ -398,6 +415,12 @@ ROLE_FAMILY_TO_PROMPT_FAMILY_KEY = {
     "ai application engineering": "software_engineering",
     "solutions engineering": "solutions_customer",
     "implementation engineering": "solutions_customer",
+    "security engineering": "security_engineering",
+    "application security engineering": "security_engineering",
+    "cloud security engineering": "security_engineering",
+    "product security engineering": "security_engineering",
+    "cybersecurity engineering": "security_engineering",
+    "security analyst": "security_engineering",
     "data analyst": "analyst_data",
     "data analytics": "analyst_data",
     "business analyst": "analyst_business",
@@ -442,6 +465,24 @@ SKILL_GENERIC_PHRASES = {
     "service design & apis",
     "product focused ui and interaction design",
     "cost aware cloud architecture",
+    "software design",
+    "system design",
+    "event driven systems",
+    "event-driven systems",
+    "prompt caching",
+    "api design",
+    "debugging",
+    "stakeholder communication",
+    "technical discussions",
+    "business analysis",
+    "requirements gathering",
+    "process improvement",
+    "process mapping",
+    "reporting insights",
+    "reporting and insights",
+    "data analysis",
+    "data visualization",
+    "dashboarding",
 }
 
 SKILL_CATEGORY_PATTERNS = {
@@ -493,7 +534,13 @@ SKILL_CATEGORY_PATTERNS = {
     ),
     "Security & Auth": (
         "auth", "authentication", "authorization", "jwt", "oauth", "security", "secret management", "owasp", "encryption",
-        "dod", "secure communications",
+        "dod", "secure communications", "iam", "sso", "saml", "oidc", "mfa", "siem", "soc", "splunk", "sentinel",
+        "vulnerability", "nessus", "qualys", "burp", "zap", "snyk", "wiz", "crowdstrike", "okta", "auth0",
+        "azure ad", "microsoft entra id", "cognito", "ping identity", "duo", "rbac", "abac", "pam", "vault", "kms",
+    ),
+    "Compliance & Frameworks": (
+        "owasp", "nist", "iso 27001", "soc 2", "hipaa", "pci", "pci dss", "cis benchmark", "cis benchmarks",
+        "mitre", "mitre att&ck", "gdpr", "sox", "fedramp", "compliance", "grc", "risk", "controls", "audit",
     ),
     "Embedded Systems": (
         "embedded", "embedded linux", "nixos", "sensor fusion", "can", "rs-232", "firmware", "serial", "control system",
@@ -1121,6 +1168,16 @@ def skill_item_looks_like_model_meta(item: str) -> bool:
     return any(marker in text for marker in meta_markers)
 
 
+def skill_item_is_blocked_generic_phrase(item: str, analysis_payload: dict) -> bool:
+    key = normalize_skill_dedupe_key(item)
+    if not key:
+        return False
+    jd_terms = {normalize_skill_dedupe_key(term) for term in (analysis_payload.get("skills_mentioned") or [])}
+    if key in jd_terms:
+        return False
+    return key in {normalize_skill_dedupe_key(phrase) for phrase in SKILL_GENERIC_PHRASES}
+
+
 def expand_skill_items(raw_items: list) -> list[str]:
     expanded: list[str] = []
     for raw_item in raw_items or []:
@@ -1188,6 +1245,8 @@ def infer_skill_category_order_key(role_family: str) -> str:
         return "backend_application"
     if "gtm" in family or "go-to-market" in family or "go to market" in family or "revops" in family or "revenue engineering" in family:
         return "gtm_engineering"
+    if "security" in family or "cybersecurity" in family or "application security" in family or "cloud security" in family:
+        return "security_engineering"
     if "data" in family or "analytics" in family:
         return "data_engineering"
     if "platform" in family or "distributed" in family or "infrastructure" in family:
@@ -1228,6 +1287,8 @@ def infer_prompt_family_key(role_family: str) -> str:
         return "analyst_business"
     if "analyst" in family or "analytics" in family:
         return "analyst_data"
+    if "security" in family or "cybersecurity" in family or "application security" in family or "cloud security" in family:
+        return "security_engineering"
     if "data engineering" in family:
         return "data_engineering"
     if "platform" in family or "distributed" in family or "infrastructure" in family or "system software" in family:
@@ -1263,10 +1324,10 @@ def build_ai_analysis_prompt() -> str:
             "Do not mirror the JD or invent unsupported domain expertise.",
             "Infer the company context, role family, problem, system, skills and technologies mentioned, and behavioral signals.",
             "Role family must describe the actual job shape, not a generic software-engineer label.",
-            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, solutions engineering, implementation engineering, AI application engineering, data analyst, business analyst, marketing analyst, product analyst, operations analyst, or GTM engineering.",
-            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, platform_distributed, embedded_systems, ai_application, solutions_engineering, analyst_data, analyst_business, analyst_marketing, gtm_engineering.",
+            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, security engineering, application security engineering, cloud security engineering, solutions engineering, implementation engineering, AI application engineering, data analyst, business analyst, marketing analyst, product analyst, operations analyst, or GTM engineering.",
+            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, platform_distributed, embedded_systems, ai_application, security_engineering, solutions_engineering, analyst_data, analyst_business, analyst_marketing, gtm_engineering.",
             "Pick the skill_category_order_key that best fits the role family and technical center of the JD.",
-            "Choose exactly one prompt_family_key from this fixed set: software_engineering, data_engineering, platform_systems, analyst_data, analyst_business, analyst_marketing, solutions_customer, gtm_engineering.",
+            "Choose exactly one prompt_family_key from this fixed set: software_engineering, data_engineering, platform_systems, security_engineering, analyst_data, analyst_business, analyst_marketing, solutions_customer, gtm_engineering.",
             "Pick the prompt_family_key that best matches the role family and what the later prompts should optimize for.",
             "If the JD centers on SQL, PySpark, Snowflake, ETL, orchestration, dashboards, or data quality, classify it as data engineering or analytics engineering rather than generic software engineering.",
             "If the JD centers on Rust, Linux, concurrency, networking, security platforms, or low-level services, classify it as platform engineering or distributed systems engineering rather than generic full-stack work.",
@@ -1274,6 +1335,7 @@ def build_ai_analysis_prompt() -> str:
             "If the JD is about building internal or product-side integrations across APIs, cloud services, microservices, authentication, event-driven systems, CI/CD, DevOps, or backend services, classify it as backend application engineering or cloud integration engineering rather than solutions engineering.",
             "Reserve solutions engineering and implementation engineering for clearly customer-facing roles such as demos, onboarding, external implementations, technical account support, pre-sales, sales engineering, or customer adoption work.",
             "If the JD centers on CRM systems, revops, lead routing, enrichment, outbound tooling, lifecycle automation, sequencing, GTM workflows, pipeline reporting, or sales/marketing system automation, classify it as GTM engineering rather than software engineering or generic analyst work.",
+            "If the JD centers on vulnerability management, application security, cloud security, identity and access management, threat detection, incident response, compliance, GRC, SOC workflows, SIEM, secrets management, encryption, OWASP, NIST, ISO 27001, SOC 2, HIPAA, PCI, or security tooling, classify it as security engineering rather than backend or platform engineering.",
             "If the JD mentions Excel, Power BI, Tableau, Looker, Jira, Confluence, Salesforce, SAP, Oracle, Workday, PeopleSoft, Banner, WMS, Manhattan SCALE, Manhattan Active, Blue Yonder, ERP, SCM, or CRM platforms, preserve those as important analyst or systems signals rather than treating them like minor supporting tools.",
             "If the JD mentions Clay, Salesforce, HubSpot, Outreach, Apollo, Marketo, 6sense, Gong, Customer.io, ZoomInfo, Smartlead, Instantly, HeyReach, Nooks, Warmly, lead routing, enrichment, outbound sequencing, or GTM automation, preserve those as important GTM systems and workflow signals.",
             "Return one unified skills_mentioned list containing all important skills, tools, frameworks, platforms, and technologies explicitly mentioned anywhere in the JD, including required, preferred, and nice-to-have items.",
@@ -1593,6 +1655,11 @@ def build_ai_resume_title_summary_prompt(prompt_family_key: str = "software_engi
             "- emphasize scale, reliability, APIs, observability, and system performance",
             "- prioritize platform constraints, architecture tradeoffs, and resilient delivery over product UI language",
         ],
+        "security_engineering": [
+            "- emphasize security engineering, identity, cloud security, application security, compliance, detection, incident response, and risk reduction",
+            "- mention security tools, frameworks, and standards when they are grounded in the JD",
+            "- do not frame the role as backend engineering unless backend work is clearly central to the JD",
+        ],
         "analyst_data": [
             "- emphasize SQL, dashboards, reporting, insights, metrics, and stakeholder decision support",
             "- frame the role around analysis, measurement, and business impact rather than software delivery",
@@ -1662,51 +1729,51 @@ def build_ai_resume_title_summary_prompt(prompt_family_key: str = "software_engi
 def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering") -> str:
     family_rules = {
         "software_engineering": [
-            "- keep JD-mentioned languages, frameworks, platforms, and tools visible when they fit the category",
-            "- balance concrete technologies with practical engineering capabilities",
+            "- prioritize named languages, frameworks, databases, cloud services, CI/CD tools, monitoring tools, and enterprise platforms",
+            "- do not add abstract engineering concepts unless they are named directly in the JD",
         ],
         "data_engineering": [
-            "- prioritize SQL, warehousing, pipelines, orchestration, data quality, and data modeling terms",
-            "- keep frontend or API tools secondary unless the JD clearly makes them central",
+            "- prioritize named data tools, databases, warehouses, orchestration tools, BI tools, SQL, Python, PySpark, and cloud data services",
+            "- keep generic data capabilities out of skills unless they are named directly in the JD",
         ],
         "platform_systems": [
-            "- prioritize platform, reliability, observability, distributed-systems, and infrastructure terms",
-            "- prefer concrete systems tools and capabilities over product-oriented frontend language",
+            "- prioritize named infrastructure, observability, security, networking, operating-system, cloud, and deployment tools",
+            "- do not use broad concepts like distributed systems, reliability, performance, or software design unless the JD names them directly",
+        ],
+        "security_engineering": [
+            "- prioritize security tools, IAM platforms, auth protocols, SIEM and detection tools, vulnerability scanners, secrets-management tools, cloud-security services, endpoint tools, and compliance frameworks",
+            "- Security & Auth should include concrete enterprise auth protocols and platforms when relevant: OAuth 2.0, OpenID Connect, SAML, JWT, SSO, MFA, RBAC, ABAC, Okta, Auth0, Microsoft Entra ID, Azure AD, Amazon Cognito, Ping Identity, Duo, HashiCorp Vault, AWS KMS",
+            "- include security standards and frameworks such as OWASP, NIST, ISO 27001, SOC 2, HIPAA, PCI DSS, CIS Benchmarks, and MITRE ATT&CK when they appear in the JD",
+            "- keep Backend Engineering and frontend frameworks out of security skills unless the JD explicitly names them",
+            "- place compliance, GRC, risk, audit, and control frameworks under Compliance & Frameworks instead of generic process categories",
         ],
         "analyst_data": [
-            "- prioritize SQL, querying, dashboards, reporting, data visualization, metrics, and experimentation terms",
-            "- prefer analysis tools, BI platforms, and insight-generation capabilities over engineering infrastructure categories",
+            "- prioritize SQL, Excel, BI platforms, analytics tools, databases, reporting systems, CRM or enterprise platforms, and scripting languages",
+            "- avoid generic analytics phrases unless the JD names them directly",
             "- preserve Excel, Power BI, Tableau, Looker, Python, R, and domain reporting systems prominently when the JD mentions them",
-            "- if the JD does not explicitly mention a named analyst tool, do not invent one; use strong generic analyst capabilities instead",
-            "- for analyst roles, keep process, reporting, stakeholder, and KPI terms in the analyst categories instead of forcing them into engineering categories",
-            "- if the category is Tools & Platforms and the JD does not mention named tools, use generic items like reporting platforms, documentation systems, workflow tools, testing tools, or business systems instead of vendor names",
+            "- if the JD does not explicitly mention a named analyst tool, use only strongly related enterprise tools or leave the category smaller",
         ],
         "analyst_business": [
-            "- prioritize business analysis, reporting, requirements, process improvement, KPI tracking, and stakeholder communication terms",
-            "- prefer workflow, planning, and insight-delivery capabilities over software-engineering abstractions",
+            "- prioritize Excel, BI tools, Jira, Confluence, ERP, WMS, CRM, SAP, Oracle, Workday, PeopleSoft, Banner, Manhattan, Blue Yonder, SQL, and reporting platforms",
+            "- avoid process phrases such as requirements gathering, stakeholder communication, traceability, risk management, and UAT unless the JD names them directly",
             "- preserve Excel, BI tools, Jira, Confluence, ERP, WMS, CRM, SAP, Oracle, Workday, PeopleSoft, Banner, Manhattan, and Blue Yonder terms prominently when the JD mentions them",
-            "- if the JD does not explicitly mention a named enterprise platform, do not invent one; use generic business-analysis capabilities instead",
-            "- keep budget tracking, risk management, traceability, UAT, and stakeholder work inside analyst-oriented categories rather than engineering categories",
-            "- if the category is Tools & Platforms and the JD does not mention named tools, use generic items like documentation systems, workflow tools, product support systems, testing tools, or business systems instead of vendor names",
+            "- if the JD does not explicitly mention a named enterprise platform, use only strongly related enterprise tools or leave the category smaller",
         ],
         "analyst_marketing": [
-            "- prioritize campaign analysis, attribution, funnel metrics, experimentation, segmentation, dashboards, and reporting terms",
-            "- prefer growth, lifecycle, and measurement capabilities over engineering infrastructure categories",
+            "- prioritize Excel, BI tools, CRM platforms, attribution tools, lifecycle platforms, analytics tools, SQL, Python, and reporting platforms",
+            "- avoid marketing process phrases unless the JD names them directly",
             "- preserve Excel, BI tools, CRM tools, Salesforce, and attribution or lifecycle measurement terms prominently when the JD mentions them",
-            "- if the JD does not explicitly mention a named marketing platform, do not invent one; use generic marketing-analytics capabilities instead",
-            "- keep campaign metrics, segmentation, reporting, and stakeholder insights inside analyst-oriented categories rather than engineering categories",
-            "- if the category is Tools & Platforms and the JD does not mention named tools, use generic items like analytics platforms, reporting tools, CRM systems, or lifecycle tools instead of vendor names",
+            "- if the JD does not explicitly mention a named marketing platform, use only strongly related enterprise tools or leave the category smaller",
         ],
         "gtm_engineering": [
-            "- prioritize CRM workflows, GTM automation, routing, enrichment, outbound systems, pipeline reporting, and revops terms",
-            "- prefer practical workflow and systems terminology over generic software-engineering abstractions",
+            "- prioritize named CRM, enrichment, sequencing, lifecycle, routing, analytics, data, and automation tools",
+            "- avoid GTM process phrases unless the JD names them directly",
             "- preserve GTM stack tools like Clay, Salesforce, HubSpot, Outreach, Apollo, Marketo, 6sense, Gong, Customer.io, ZoomInfo, Smartlead, Instantly, HeyReach, Nooks, and Warmly when the JD mentions them",
-            "- if the JD does not explicitly mention a named GTM tool, do not invent one; use strong generic GTM workflow capabilities instead",
-            "- keep reporting, pipeline visibility, lifecycle operations, stakeholder coordination, and experiment-oriented skills inside GTM-oriented categories rather than generic engineering ones",
+            "- if the JD does not explicitly mention a named GTM tool, use only strongly related enterprise tools or leave the category smaller",
         ],
         "solutions_customer": [
-            "- prioritize integrations, troubleshooting, customer-facing platforms, reporting, and communication-friendly technical tools",
-            "- keep the section practical and delivery-oriented rather than deeply platform-centric",
+            "- prioritize named integration tools, CRM or customer platforms, ticketing tools, reporting tools, cloud services, APIs, databases, and scripting languages",
+            "- avoid broad delivery phrases unless the JD names them directly",
         ],
     }
     selected_rules = family_rules.get(prompt_family_key, family_rules["software_engineering"])
@@ -1719,25 +1786,27 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
             "You will receive an exact ordered list of allowed skill categories.",
             "Fill only those categories and keep them in the same order.",
             "Use the role family, responsibilities, workflows, and unified skills_mentioned list from the analysis object.",
-            "Treat all important JD-mentioned skills and technologies as valid signals for the final section.",
+            "Treat all important JD-mentioned tools, platforms, languages, databases, frameworks, and cloud services as valid signals for the final section.",
             "",
             "SKILLS:",
             "- use only the provided categories",
             "- do not invent new categories",
-            "- each item must be one short skill name or capability name",
+            "- each item must be one concrete tool, platform, language, framework, database, cloud service, enterprise system, or scripting technology",
             "- no explanations, no qualifier text, no mini-sentences",
-            "- prefer concrete technologies and concise capability names",
-            "- do not use vague filler like 'data-driven solutions', 'deployment strategies', or 'technical discussions'",
+            "- prefer exact product and technology names over capability names",
+            "- include tools explicitly named in the JD first",
+            "- include closely related enterprise tools only when they fit the JD's domain and category",
+            "- do not add broad software concepts such as software design, system design, event-driven systems, prompt caching, API design, debugging, stakeholder communication, data-driven solutions, deployment strategies, or technical discussions unless the exact phrase appears in the JD",
             "- do not repeat the same concept across categories",
             "- skip a category only if it is truly irrelevant; otherwise fill it with 2-5 strong items",
-            "- each item must read like a real resume skill, not a broken fragment or half sentence",
-            "- if an item looks truncated, awkward, or too descriptive, rewrite it into a clean recruiter-scan term",
-            "- for analyst families, prefer JD-grounded tools first; if the JD does not name tools, use generic capability labels instead of common vendor names",
+            "- each item must read like a real named skill a recruiter could search for",
+            "- if an item looks abstract, descriptive, truncated, or like a workflow phrase, replace it with a concrete tool name or remove it",
+            "- for analyst, GTM, and enterprise roles, prefer named business systems and enterprise platforms over generic capabilities",
             *selected_rules,
             "- expected style:",
             "  - Programming Languages: TypeScript, JavaScript, Python",
-            "  - Backend Engineering: Node.js, GraphQL, REST API design",
-            "  - Data & Storage: MongoDB, BigQuery, SQL",
+            "  - Backend Engineering: Node.js, GraphQL, Spring Boot",
+            "  - Data & Storage: MongoDB, BigQuery, PostgreSQL",
             "",
             "Return only the final result matching the schema.",
         ]
@@ -1762,6 +1831,12 @@ def build_ai_resume_experience_prompt(prompt_family_key: str = "software_enginee
         ],
         "platform_systems": [
             "- recent roles should highlight scale, observability, reliability, infrastructure, and performance tradeoffs",
+        ],
+        "security_engineering": [
+            "- recent roles should highlight security controls, identity and access, vulnerability remediation, cloud security, compliance evidence, detection, and incident response",
+            "- use security-engineering framing rather than backend feature-delivery framing",
+            "- mention compliance frameworks only when they are present in the JD or selected skills",
+            "- do not introduce backend frameworks unless they already appear in the JD or selected skills",
         ],
         "analyst_data": [
             "- recent roles should highlight SQL analysis, dashboards, reporting, experimentation, insight delivery, and decision support",
@@ -1870,6 +1945,12 @@ def build_ai_resume_experience_subset_prompt(blueprints: list[dict], prompt_fami
         ],
         "platform_systems": [
             "- selected skills should guide the stack used in bullets; prioritize infrastructure, reliability, observability, scale, and system tradeoffs",
+        ],
+        "security_engineering": [
+            "- selected skills should guide the stack used in bullets; prioritize security controls, IAM, vulnerability management, cloud security, SIEM or detection, compliance, and incident response",
+            "- use security-engineering framing rather than backend feature-delivery framing",
+            "- do not introduce backend frameworks unless they already appear in the JD or selected skills",
+            "- do not introduce compliance frameworks unless they already appear in the JD or selected skills",
         ],
         "analyst_data": [
             "- selected skills should guide the stack used in bullets; prioritize reporting, SQL analysis, dashboards, experimentation, and insight delivery",
@@ -1990,10 +2071,11 @@ def build_ai_core_review_prompt() -> str:
             "Judge whether the current summary and skills are ready to keep or should be revised.",
             "Focus on three risks:",
             "- summary that sounds copied from company or JD wording, too generic, or mis-emphasized for the role",
-            "- skills that are too vague, too copied, missing obvious concrete stack, or awkwardly categorized",
+            "- skills that include broad capabilities instead of named tools, miss obvious JD tools, or are awkwardly categorized",
             "- wording that sounds stiff, overpacked, truncated, or visibly AI-generated instead of natural resume writing",
             "Flag summaries that stack too many tools, systems, or clauses into one sentence.",
-            "Flag skills that read like broken fragments instead of clean recruiter-scan terms.",
+            "Flag skills that read like broken fragments, process phrases, or abstract concepts instead of named recruiter-searchable tools.",
+            "Do not flag a skills section just because it could include more adjacent tools; refinement must not broaden the stack.",
             "Do not review professional experience.",
             "Be concise and practical.",
             "Return only the final result matching the schema.",
@@ -2004,20 +2086,21 @@ def build_ai_core_review_prompt() -> str:
 def build_ai_core_correction_prompt() -> str:
     return "\n".join(
         [
-            "You refine only the resume summary and skills section for a tailored target-fit resume.",
+            "You refine only the resume summary for a tailored target-fit resume.",
             "Use the analysis object and current draft as the source of truth.",
-            "Keep the title unchanged outside the schema; only return Updated Summary and Updated Skills.",
-            "Inspect the current summary and skills, improve them only if needed, and otherwise keep them close to the draft.",
+            "Keep the title unchanged outside the schema; return Updated Summary and the existing Updated Skills.",
+            "Inspect the current summary, improve it only if needed, and otherwise keep it close to the draft.",
+            "Do not rewrite, add, remove, reorder, or expand the skills section.",
+            "Return the current skills exactly as provided, preserving categories, order, and items.",
             "Follow the role family and the JD facts from the analysis object.",
-            "Use the skills_mentioned list, responsibilities, and workflows to keep the strongest role match visible.",
+            "Use the skills_mentioned list, responsibilities, and workflows only for summary refinement.",
             "Use only the provided skill categories and keep them in the provided order.",
-            "Focus on sharper role emphasis, cleaner summary phrasing, and more concrete, believable skills.",
+            "Focus on sharper role emphasis and cleaner summary phrasing.",
             "Do not let the refinement smooth a data, platform, AI application, or solutions role back into generic software-engineering language.",
-            "Do not replace strong concrete stack or workflow terms with broader wording just because it sounds cleaner.",
             "If the summary mentions years of experience at all, it must say 4+ years and never anything higher.",
             "Do not copy JD wording directly.",
             "Make the writing sound human and recruiter-natural, not optimized or assembled.",
-            "Break up dense phrasing, remove stacked jargon, and rewrite truncated skill items into clean terms.",
+            "Break up dense phrasing and remove stacked jargon from the summary.",
             "Do not touch professional experience.",
             "Return only the final result matching the schema.",
         ]
@@ -2036,7 +2119,7 @@ def ai_analysis_schema() -> dict:
             "target_role": {"type": "string"},
             "role_family": {"type": "string"},
             "skill_category_order_key": {"type": "string", "enum": sorted(SKILL_CATEGORY_ORDER_TEMPLATES.keys())},
-            "prompt_family_key": {"type": "string", "enum": ["software_engineering", "data_engineering", "platform_systems", "analyst_data", "analyst_business", "analyst_marketing", "solutions_customer", "gtm_engineering"]},
+            "prompt_family_key": {"type": "string", "enum": ["software_engineering", "data_engineering", "platform_systems", "security_engineering", "analyst_data", "analyst_business", "analyst_marketing", "solutions_customer", "gtm_engineering"]},
             "core_problem": {"type": "string"},
             "hire_problem": {"type": "string"},
             "desired_outcomes": {"type": "array", "items": {"type": "string"}},
@@ -2352,6 +2435,12 @@ DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY = {
         "mckinsey": "Platform Engineer",
         "uber": "Platform Engineer",
         "kpmg": "Software Engineer",
+        "trigent": "Frontend Developer",
+    },
+    "security_engineering": {
+        "mckinsey": "Security Engineer",
+        "uber": "Security Engineer",
+        "kpmg": "Security Analyst",
         "trigent": "Frontend Developer",
     },
     "analyst_data": {
@@ -2989,6 +3078,10 @@ def validate_model_payload(model_payload: dict) -> list[str]:
                 issues.append(f"Skill item '{item}' in '{category}' is malformed.")
             if skill_item_looks_like_model_meta(item):
                 issues.append(f"Skill item '{item}' in '{category}' contains model meta text.")
+            if skill_item_is_blocked_generic_phrase(item, analysis):
+                issues.append(
+                    f"Skill item '{item}' in '{category}' is too generic; use a named JD tool or related enterprise tool instead."
+                )
             all_skill_items.append(item.lower())
 
     if len(set(all_skill_items)) < max(len(all_skill_items) - 3, 1):
@@ -3119,6 +3212,10 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
                 issues.append(f"Skill item '{item}' in '{category}' is malformed.")
             if skill_item_looks_like_model_meta(item):
                 issues.append(f"Skill item '{item}' in '{category}' contains model meta text.")
+            if skill_item_is_blocked_generic_phrase(item, analysis_payload):
+                issues.append(
+                    f"Skill item '{item}' in '{category}' is too generic; use a named JD tool or related enterprise tool instead."
+                )
             if is_analyst_prompt_family(analysis_payload):
                 unsupported_tool = analyst_tool_not_in_jd(item, analysis_payload)
                 if unsupported_tool:
@@ -3200,6 +3297,10 @@ def validate_skills_only_payload(skills_payload: dict, analysis_payload: dict) -
         if len(items) < 2:
             issues.append(f"Skills category '{category}' must contain at least 2 skills.")
         for item in items:
+            if skill_item_is_blocked_generic_phrase(item, analysis_payload):
+                issues.append(
+                    f"Skill item '{item}' in '{category}' is too generic; use a named JD tool or related enterprise tool instead."
+                )
             if is_analyst_prompt_family(analysis_payload):
                 unsupported_tool = analyst_tool_not_in_jd(item, analysis_payload)
                 if unsupported_tool:
@@ -3215,6 +3316,30 @@ def validate_skills_only_payload(skills_payload: dict, analysis_payload: dict) -
     if not analysis_payload.get("core_problem"):
         issues.append("Analysis is missing core_problem.")
     return issues
+
+
+def validate_refined_skills_do_not_expand(original_skills_payload: dict, corrected_skills_payload: dict, analysis_payload: dict) -> list[str]:
+    original_items = {
+        normalize_skill_dedupe_key(item)
+        for entry in normalize_updated_skills(original_skills_payload.get("updated_skills") or [])
+        for item in expand_skill_items(entry.get("items", []))
+    }
+    corrected_items = {
+        normalize_skill_dedupe_key(item)
+        for entry in normalize_updated_skills(corrected_skills_payload.get("updated_skills") or [])
+        for item in expand_skill_items(entry.get("items", []))
+    }
+    jd_terms = {
+        normalize_skill_dedupe_key(term)
+        for term in (analysis_payload.get("skills_mentioned") or [])
+        if normalize_skill_dedupe_key(term)
+    }
+    added_items = sorted(item for item in corrected_items - original_items if item and item not in jd_terms)
+    if not added_items:
+        return []
+    return [
+        "Core refinement added skills not explicitly present in the JD analysis: " + ", ".join(added_items[:8]) + "."
+    ]
 
 
 def validate_experience_subset_payload(experience_payload: dict, blueprints: list[dict]) -> list[str]:
@@ -3481,13 +3606,20 @@ def generate_skills_from_analysis(
         issue for issue in skill_issues
         if "introduces analyst tool" in issue or "introduces GTM tool" in issue
     ]
-    if unsupported_tool_issues:
+    generic_skill_issues = [
+        issue for issue in skill_issues
+        if "is too generic; use a named JD tool or related enterprise tool instead" in issue
+    ]
+    retryable_skill_issues = unsupported_tool_issues + generic_skill_issues
+    if retryable_skill_issues:
         retry_lines = [
-            "Previous attempt used named tools that are not supported by the JD.",
-            "Replace unsupported vendor names with JD-grounded tools or generic capability labels.",
-            "If the JD does not mention a named tool for Tools & Platforms, use generic items instead of vendor names.",
+            "Previous attempt used unsupported tools or generic skill phrases.",
+            "Replace unsupported vendor names with JD-grounded tools or closely related enterprise tools.",
+            "Do not replace unsupported vendor names with generic capability labels or process phrases.",
+            "Remove generic skill phrases and use named tools, platforms, languages, frameworks, databases, cloud services, or enterprise systems.",
+            "If the JD does not mention a named tool for Tools & Platforms, use related enterprise platforms only when they fit the JD context, otherwise keep the category smaller.",
             "Fix these exact issues:",
-            *[f"- {issue}" for issue in unsupported_tool_issues],
+            *[f"- {issue}" for issue in retryable_skill_issues],
         ]
         skills_payload = run_generation("\n".join(retry_lines))
     return skills_payload
@@ -4992,14 +5124,10 @@ def review_ai_core():
             "updated_title": str(title_summary.get("updated_title", "")).strip(),
             "updated_summary": str(corrected_payload.get("updated_summary", "")).strip(),
         }
-        corrected_skills = normalize_skills_for_order(
-            {"updated_skills": corrected_payload.get("updated_skills", [])},
-            ordered_categories,
-        )
+        corrected_skills = normalize_skills_for_order(skills_payload, ordered_categories)
 
         summary_issues = validate_title_summary_payload(corrected_title_summary, analysis_payload, summary_max_buffer=10)
-        skills_issues = validate_skills_only_payload(corrected_skills, analysis_payload)
-        issues = summary_issues + skills_issues
+        issues = summary_issues
         if issues:
             corrected_title_summary = title_summary
             corrected_skills = skills_payload
@@ -5007,8 +5135,6 @@ def review_ai_core():
         else:
             revised = (
                 corrected_title_summary.get("updated_summary", "").strip() != str(title_summary.get("updated_summary", "")).strip()
-                or normalize_updated_skills(corrected_skills.get("updated_skills", []))
-                != normalize_updated_skills(skills_payload.get("updated_skills", []))
             )
 
         session["title_summary"] = corrected_title_summary
