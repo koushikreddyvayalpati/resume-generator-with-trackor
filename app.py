@@ -168,6 +168,7 @@ ALLOWED_SKILL_CATEGORIES = {
     "System Design & Performance",
     "Testing & Quality",
     "AI & LLM Systems",
+    "Machine Learning & Statistics",
     "Data Engineering",
     "Mobile Development",
     "Embedded Systems",
@@ -215,12 +216,22 @@ SKILL_CATEGORY_ORDER_TEMPLATES = {
         "Programming Languages",
         "Data Engineering",
         "Data & Storage",
-        "Frontend Engineering",
+        "BI & Visualization",
         "Cloud & Infrastructure",
         "DevOps & CI/CD",
         "Testing & Quality",
         "AI & LLM Systems",
+        "Tools & Platforms",
+    ],
+    "data_science": [
+        "Programming Languages",
+        "Machine Learning & Statistics",
+        "Data & Storage",
+        "AI & LLM Systems",
         "BI & Visualization",
+        "Cloud & Infrastructure",
+        "Tools & Platforms",
+        "Testing & Quality",
     ],
     "platform_distributed": [
         "Programming Languages",
@@ -338,6 +349,7 @@ PREFERRED_SKILL_CATEGORY_ORDER = [
     "Testing & Quality",
     "System Design & Performance",
     "AI & LLM Systems",
+    "Machine Learning & Statistics",
     "Data Engineering",
     "Mobile Development",
     "Embedded Systems",
@@ -363,6 +375,13 @@ ROLE_FAMILY_TO_SKILL_ORDER_KEY = {
     "cloud integration engineering": "backend_application",
     "data engineering": "data_engineering",
     "analytics engineering": "data_engineering",
+    "data science": "data_science",
+    "data scientist": "data_science",
+    "machine learning engineering": "data_science",
+    "machine learning engineer": "data_science",
+    "ml engineering": "data_science",
+    "ml engineer": "data_science",
+    "applied scientist": "data_science",
     "platform engineering": "platform_distributed",
     "distributed systems engineering": "platform_distributed",
     "cloud infrastructure engineering": "platform_distributed",
@@ -424,6 +443,13 @@ ROLE_FAMILY_TO_PROMPT_FAMILY_KEY = {
     "cloud integration engineering": "software_engineering",
     "data engineering": "data_engineering",
     "analytics engineering": "data_engineering",
+    "data science": "data_science",
+    "data scientist": "data_science",
+    "machine learning engineering": "data_science",
+    "machine learning engineer": "data_science",
+    "ml engineering": "data_science",
+    "ml engineer": "data_science",
+    "applied scientist": "data_science",
     "platform engineering": "platform_systems",
     "distributed systems engineering": "platform_systems",
     "cloud infrastructure engineering": "platform_systems",
@@ -506,6 +532,16 @@ SKILL_GENERIC_PHRASES = {
     "data analysis",
     "data visualization",
     "dashboarding",
+    "pipeline design",
+    "etl pipelines",
+    "data pipelines",
+    "machine learning workflows",
+    "statistical analysis",
+    "predictive modeling",
+    "feature engineering",
+    "model evaluation",
+    "data wrangling",
+    "business intelligence",
 }
 
 SKILL_HARD_BLOCKED_PHRASES = {
@@ -566,9 +602,24 @@ SKILL_CATEGORY_PATTERNS = {
         "langchain", "langgraph", "crewai", "autogen", "semantic kernel", "llamaindex", "guardrails", "langsmith",
         "langfuse", "helicone", "openai api", "anthropic api", "claude api", "agents sdk", "a2a", "agent-to-agent",
     ),
+    "Machine Learning & Statistics": (
+        "scikit-learn", "sklearn", "pandas", "numpy", "scipy", "tensorflow", "pytorch", "keras", "xgboost",
+        "lightgbm", "catboost", "statsmodels", "prophet", "mlflow", "kubeflow", "sagemaker", "vertex ai",
+        "azure machine learning", "azure ml", "databricks ml", "spark mllib", "h2o", "model registry",
+        "ab testing", "a/b testing", "experimentation", "regression", "classification", "clustering",
+    ),
     "Data Engineering": (
-        "pyspark", "spark", "etl", "elt", "airflow", "orchestration", "data pipeline", "data ingestion", "batch", "stream",
-        "workflow orchestration", "copy load",
+        "pyspark", "spark", "etl", "elt", "airflow", "dagster", "prefect", "dbt", "fivetran", "matillion",
+        "informatica", "talend", "azure data factory", "aws glue", "dataflow", "dataproc", "emr",
+        "orchestration", "data pipeline", "data ingestion", "batch", "stream", "workflow orchestration", "copy load",
+    ),
+    "BI & Visualization": (
+        "tableau", "power bi", "looker", "looker studio", "mode", "metabase", "superset", "qlik", "domo",
+        "excel", "google sheets", "dashboard", "dashboards", "reporting",
+    ),
+    "Data Analysis & Querying": (
+        "sql", "python", "r", "excel", "pandas", "numpy", "snowflake", "bigquery", "redshift", "databricks",
+        "athena", "presto", "trino", "hive", "spark sql", "looker", "tableau", "power bi",
     ),
     "Messaging & Streaming": (
         "kafka", "pubsub", "streaming", "websocket", "tcp", "udp", "messaging", "event", "queue",
@@ -1134,11 +1185,37 @@ def normalize_analysis_payload(analysis_payload: dict) -> dict:
         "langchain", "langgraph", "agent framework", "programmable governance", "agent governance"
     )
     looks_agentic_ai = any(marker in combined_signals for marker in agentic_markers)
+    data_science_markers = (
+        "data scientist", "data science", "machine learning", "ml model", "model training", "model evaluation",
+        "feature engineering", "predictive model", "forecasting", "classification", "regression", "clustering",
+        "experiment", "experimentation", "a/b test", "ab test", "nlp", "computer vision", "recommendation",
+        "scikit", "pytorch", "tensorflow", "xgboost", "mlflow", "sagemaker", "vertex ai"
+    )
+    analyst_markers = (
+        "data analyst", "reporting analyst", "business intelligence", "bi analyst", "dashboard", "dashboards",
+        "kpi", "ad hoc analysis", "sql analysis", "excel", "tableau", "power bi", "looker", "reporting"
+    )
+    engineering_markers = (
+        "pipeline", "etl", "elt", "orchestration", "airflow", "dagster", "prefect", "dbt", "spark", "pyspark",
+        "data warehouse", "data lake", "data ingestion"
+    )
+    looks_data_science = any(marker in combined_signals for marker in data_science_markers)
+    looks_data_analyst = any(marker in combined_signals for marker in analyst_markers) and not any(
+        marker in combined_signals for marker in engineering_markers + data_science_markers
+    )
 
     if looks_agentic_ai:
         normalized["role_family"] = "agentic AI engineering"
         normalized["prompt_family_key"] = "agentic_ai_engineering"
         normalized["skill_category_order_key"] = "agentic_ai_engineering"
+    elif looks_data_science:
+        normalized["role_family"] = "data science"
+        normalized["prompt_family_key"] = "data_science"
+        normalized["skill_category_order_key"] = "data_science"
+    elif looks_data_analyst:
+        normalized["role_family"] = "data analyst"
+        normalized["prompt_family_key"] = "analyst_data"
+        normalized["skill_category_order_key"] = "analyst_data"
     elif (
         normalized.get("prompt_family_key") == "solutions_customer"
         and "integration" in combined_signals
@@ -1286,6 +1363,51 @@ def validate_agentic_data_storage(skills: list[dict], analysis_payload: dict) ->
     return ["Agentic AI skills should include at least one vector store or embedding store in Data & Storage."]
 
 
+def skill_items_by_category(skills: list[dict]) -> dict[str, list[str]]:
+    return {
+        str(entry.get("category", "")).strip(): [
+            normalize_skill_dedupe_key(item)
+            for item in expand_skill_items(entry.get("items", []))
+            if normalize_skill_dedupe_key(item)
+        ]
+        for entry in skills
+    }
+
+
+def any_skill_matches(items: list[str], terms: set[str]) -> bool:
+    return any(any(term in item for term in terms) for item in items)
+
+
+def validate_data_role_skills(skills: list[dict], analysis_payload: dict) -> list[str]:
+    prompt_family = str(analysis_payload.get("prompt_family_key", "")).strip()
+    by_category = skill_items_by_category(skills)
+    issues: list[str] = []
+
+    warehouse_terms = {"snowflake", "bigquery", "redshift", "databricks", "postgresql", "postgres", "sql server", "oracle", "s3", "adls"}
+    orchestration_terms = {"airflow", "dagster", "prefect", "dbt", "aws glue", "azure data factory", "spark", "pyspark", "databricks"}
+    ml_terms = {"scikit learn", "scikit-learn", "pandas", "numpy", "scipy", "pytorch", "tensorflow", "xgboost", "lightgbm", "statsmodels", "mlflow", "sagemaker", "vertex ai", "databricks ml"}
+    bi_terms = {"tableau", "power bi", "looker", "mode", "metabase", "superset", "qlik", "excel"}
+    query_terms = {"sql", "python", "r", "snowflake", "bigquery", "redshift", "databricks", "athena", "trino", "excel"}
+
+    if prompt_family == "data_engineering":
+        if not any_skill_matches(by_category.get("Data & Storage", []), warehouse_terms):
+            issues.append("Data engineering skills should include at least one concrete warehouse, lake, or database in Data & Storage.")
+        if not any_skill_matches(by_category.get("Data Engineering", []), orchestration_terms):
+            issues.append("Data engineering skills should include at least one concrete orchestration, transformation, or processing tool in Data Engineering.")
+    elif prompt_family == "data_science":
+        if not any_skill_matches(by_category.get("Machine Learning & Statistics", []), ml_terms):
+            issues.append("Data science skills should include at least one concrete ML/statistics library or model platform in Machine Learning & Statistics.")
+        if not any_skill_matches(by_category.get("Data & Storage", []), warehouse_terms):
+            issues.append("Data science skills should include at least one concrete database, warehouse, or lakehouse in Data & Storage.")
+    elif prompt_family == "analyst_data":
+        if not any_skill_matches(by_category.get("Data Analysis & Querying", []), query_terms):
+            issues.append("Data analyst skills should include at least one concrete query or analysis tool in Data Analysis & Querying.")
+        if not any_skill_matches(by_category.get("BI & Visualization", []), bi_terms):
+            issues.append("Data analyst skills should include at least one concrete BI or visualization tool in BI & Visualization.")
+
+    return issues
+
+
 def expand_skill_items(raw_items: list) -> list[str]:
     expanded: list[str] = []
     for raw_item in raw_items or []:
@@ -1357,6 +1479,8 @@ def infer_skill_category_order_key(role_family: str) -> str:
         return "agentic_ai_engineering"
     if "security" in family or "cybersecurity" in family or "application security" in family or "cloud security" in family:
         return "security_engineering"
+    if "data scientist" in family or "data science" in family or "machine learning" in family or "ml engineer" in family or "applied scientist" in family:
+        return "data_science"
     if "data" in family or "analytics" in family:
         return "data_engineering"
     if "platform" in family or "distributed" in family or "infrastructure" in family:
@@ -1393,6 +1517,10 @@ def infer_prompt_family_key(role_family: str) -> str:
         return "gtm_engineering"
     if "agent" in family or "agentic" in family or "llm agent" in family:
         return "agentic_ai_engineering"
+    if "data scientist" in family or "data science" in family or "machine learning" in family or "ml engineer" in family or "applied scientist" in family:
+        return "data_science"
+    if "data engineering" in family or "data engineer" in family or "analytics engineering" in family or "analytics engineer" in family:
+        return "data_engineering"
     if "marketing analyst" in family:
         return "analyst_marketing"
     if "business analyst" in family or "operations analyst" in family:
@@ -1401,8 +1529,6 @@ def infer_prompt_family_key(role_family: str) -> str:
         return "analyst_data"
     if "security" in family or "cybersecurity" in family or "application security" in family or "cloud security" in family:
         return "security_engineering"
-    if "data engineering" in family:
-        return "data_engineering"
     if "platform" in family or "distributed" in family or "infrastructure" in family or "system software" in family:
         return "platform_systems"
     if "solution" in family or "implementation" in family:
@@ -1436,12 +1562,14 @@ def build_ai_analysis_prompt() -> str:
             "Do not mirror the JD or invent unsupported domain expertise.",
             "Infer the company context, role family, problem, system, skills and technologies mentioned, and behavioral signals.",
             "Role family must describe the actual job shape, not a generic software-engineer label.",
-            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, security engineering, application security engineering, cloud security engineering, solutions engineering, implementation engineering, AI application engineering, agentic AI engineering, AI agent engineering, data analyst, business analyst, marketing analyst, product analyst, operations analyst, or GTM engineering.",
-            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, platform_distributed, embedded_systems, ai_application, agentic_ai_engineering, security_engineering, solutions_engineering, analyst_data, analyst_business, analyst_marketing, gtm_engineering.",
+            "Prefer precise role-family labels such as: full-stack product engineering, backend application engineering, data engineering, analytics engineering, data science, machine learning engineering, platform engineering, distributed systems engineering, cloud infrastructure engineering, security engineering, application security engineering, cloud security engineering, solutions engineering, implementation engineering, AI application engineering, agentic AI engineering, AI agent engineering, data analyst, business analyst, marketing analyst, product analyst, operations analyst, or GTM engineering.",
+            "Choose exactly one skill_category_order_key from this fixed set: fullstack_product, backend_application, data_engineering, data_science, platform_distributed, embedded_systems, ai_application, agentic_ai_engineering, security_engineering, solutions_engineering, analyst_data, analyst_business, analyst_marketing, gtm_engineering.",
             "Pick the skill_category_order_key that best fits the role family and technical center of the JD.",
-            "Choose exactly one prompt_family_key from this fixed set: software_engineering, data_engineering, platform_systems, agentic_ai_engineering, security_engineering, analyst_data, analyst_business, analyst_marketing, solutions_customer, gtm_engineering.",
+            "Choose exactly one prompt_family_key from this fixed set: software_engineering, data_engineering, data_science, platform_systems, agentic_ai_engineering, security_engineering, analyst_data, analyst_business, analyst_marketing, solutions_customer, gtm_engineering.",
             "Pick the prompt_family_key that best matches the role family and what the later prompts should optimize for.",
             "If the JD centers on SQL, PySpark, Snowflake, ETL, orchestration, dashboards, or data quality, classify it as data engineering or analytics engineering rather than generic software engineering.",
+            "If the JD centers on machine learning, statistical modeling, experimentation, forecasting, recommendation systems, NLP, computer vision, model training, feature engineering, model evaluation, or ML platforms, classify it as data science or machine learning engineering rather than data engineering.",
+            "If the JD centers on SQL analysis, dashboards, reporting, BI tools, Excel, stakeholder insights, KPI tracking, funnel metrics, or ad hoc analysis without building pipelines or ML models, classify it as data analyst rather than data engineering.",
             "If the JD centers on Rust, Linux, concurrency, networking, security platforms, or low-level services, classify it as platform engineering or distributed systems engineering rather than generic full-stack work.",
             "If the JD centers on AI agents, agent orchestration, agent-to-agent communication, autonomous agents, tool calling, function calling, MCP, Model Context Protocol, agent governance, programmable policy for agents, LLM APIs, OpenAI, Anthropic, LangChain, LangGraph, or agent frameworks, classify it as agentic AI engineering rather than distributed systems or backend engineering.",
             "If the JD centers on reporting, dashboards, SQL analysis, business insights, stakeholder support, campaign measurement, attribution, funnel metrics, requirements gathering, or KPI analysis, classify it as an analyst family rather than software engineering.",
@@ -1764,6 +1892,11 @@ def build_ai_resume_title_summary_prompt(prompt_family_key: str = "software_engi
             "- mention frontend work only as supporting capability for data users when relevant",
             "- keep the summary focused on data systems and operational outcomes rather than generic software engineering language",
         ],
+        "data_science": [
+            "- emphasize modeling, experimentation, feature work, model evaluation, ML platforms, and measurable decision or product impact",
+            "- mention concrete ML/data tools when grounded in the JD, such as Python, SQL, pandas, scikit-learn, PyTorch, TensorFlow, MLflow, Databricks, SageMaker, or Vertex AI",
+            "- do not frame data science roles as data engineering unless pipelines are clearly central to the JD",
+        ],
         "agentic_ai_engineering": [
             "- emphasize AI-agent infrastructure, agent orchestration, tool protocols, LLM APIs, governance, policy controls, and production reliability",
             "- surface MCP, tool calling, function calling, OpenAI, Anthropic, LangChain, LangGraph, vector stores, evals, tracing, and policy/governance tools when grounded in the JD",
@@ -1852,7 +1985,15 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
         ],
         "data_engineering": [
             "- prioritize named data tools, databases, warehouses, orchestration tools, BI tools, SQL, Python, PySpark, and cloud data services",
+            "- Data Engineering should include concrete orchestration or transformation tools when relevant: Airflow, Dagster, Prefect, dbt, AWS Glue, Azure Data Factory, Databricks, Spark, PySpark",
+            "- Data & Storage should include concrete warehouses/databases when relevant: Snowflake, BigQuery, Redshift, Databricks, PostgreSQL, SQL Server, Oracle, S3, ADLS",
             "- keep generic data capabilities out of skills unless they are named directly in the JD",
+        ],
+        "data_science": [
+            "- prioritize ML/statistical tools, languages, notebooks, model platforms, data stores, and experiment tracking tools",
+            "- Machine Learning & Statistics should include concrete items when relevant: scikit-learn, pandas, NumPy, SciPy, PyTorch, TensorFlow, XGBoost, LightGBM, statsmodels, MLflow, SageMaker, Vertex AI, Databricks ML",
+            "- Data & Storage should include concrete databases, warehouses, or lakehouse tools when relevant: Snowflake, BigQuery, Databricks, Redshift, PostgreSQL, MongoDB, S3",
+            "- avoid generic phrases such as predictive modeling, feature engineering, statistical analysis, machine learning workflows, or model evaluation unless the exact phrase appears in the JD",
         ],
         "agentic_ai_engineering": [
             "- prioritize agent infrastructure and LLM stack: MCP, Model Context Protocol, tool calling, function calling, OpenAI API, Anthropic API, LangChain, LangGraph, AutoGen, CrewAI, Semantic Kernel, LlamaIndex, Agents SDK",
@@ -1880,6 +2021,9 @@ def build_ai_resume_skills_prompt(prompt_family_key: str = "software_engineering
             "- prioritize SQL, Excel, BI platforms, analytics tools, databases, reporting systems, CRM or enterprise platforms, and scripting languages",
             "- avoid generic analytics phrases unless the JD names them directly",
             "- preserve Excel, Power BI, Tableau, Looker, Python, R, and domain reporting systems prominently when the JD mentions them",
+            "- Data Analysis & Querying should include concrete querying tools and databases when relevant: SQL, Excel, Python, R, Snowflake, BigQuery, Redshift, Databricks, Athena, Trino",
+            "- BI & Visualization should include concrete BI tools when relevant: Tableau, Power BI, Looker, Mode, Metabase, Superset, Qlik",
+            "- avoid generic phrases such as data analysis, dashboarding, reporting insights, stakeholder communication, or KPI tracking unless the exact phrase appears in the JD",
             "- if the JD does not explicitly mention a named analyst tool, use only strongly related enterprise tools or leave the category smaller",
         ],
         "analyst_business": [
@@ -1957,6 +2101,11 @@ def build_ai_resume_experience_prompt(prompt_family_key: str = "software_enginee
         "data_engineering": [
             "- recent roles should highlight pipelines, warehousing, orchestration, data quality, reporting data flows, and measurable operational improvement",
             "- describe systems and workflows in data terms rather than generic product-engineering language",
+        ],
+        "data_science": [
+            "- recent roles should highlight model development, experimentation, feature work, evaluation, deployment support, and measurable business or product impact",
+            "- describe systems and outcomes in ML/data-science terms rather than pipeline-engineering terms unless pipelines are central to the JD",
+            "- do not introduce ML libraries or model platforms unless they appear in the JD or selected skills",
         ],
         "agentic_ai_engineering": [
             "- recent roles should highlight agent orchestration, LLM API integration, tool execution, governance controls, retrieval or memory, evals, tracing, and production reliability",
@@ -2076,6 +2225,11 @@ def build_ai_resume_experience_subset_prompt(blueprints: list[dict], prompt_fami
         "data_engineering": [
             "- selected skills should guide the stack used in bullets; prioritize SQL, pipelines, warehousing, orchestration, and data-quality workflows",
             "- describe systems and impacts in data workflow terms",
+        ],
+        "data_science": [
+            "- selected skills should guide the stack used in bullets; prioritize model development, experimentation, feature work, evaluation, ML platforms, and measurable decision or product impact",
+            "- use ML/data-science framing rather than pipeline-engineering framing unless pipelines are central to the JD",
+            "- do not introduce ML libraries or model platforms unless they appear in the JD or selected skills",
         ],
         "agentic_ai_engineering": [
             "- selected skills should guide the stack used in bullets; prioritize agent orchestration, LLM APIs, MCP or tool protocols, governance controls, retrieval or memory, evals, tracing, and production reliability",
@@ -2258,7 +2412,7 @@ def ai_analysis_schema() -> dict:
             "target_role": {"type": "string"},
             "role_family": {"type": "string"},
             "skill_category_order_key": {"type": "string", "enum": sorted(SKILL_CATEGORY_ORDER_TEMPLATES.keys())},
-            "prompt_family_key": {"type": "string", "enum": ["software_engineering", "data_engineering", "platform_systems", "agentic_ai_engineering", "security_engineering", "analyst_data", "analyst_business", "analyst_marketing", "solutions_customer", "gtm_engineering"]},
+            "prompt_family_key": {"type": "string", "enum": ["software_engineering", "data_engineering", "data_science", "platform_systems", "agentic_ai_engineering", "security_engineering", "analyst_data", "analyst_business", "analyst_marketing", "solutions_customer", "gtm_engineering"]},
             "core_problem": {"type": "string"},
             "hire_problem": {"type": "string"},
             "desired_outcomes": {"type": "array", "items": {"type": "string"}},
@@ -2568,6 +2722,12 @@ DEFAULT_ROLE_TITLES_BY_PROMPT_FAMILY = {
         "mckinsey": "Data Engineer",
         "uber": "Data Engineer",
         "kpmg": "Java Full Stack Developer",
+        "trigent": "Frontend Developer",
+    },
+    "data_science": {
+        "mckinsey": "Data Scientist",
+        "uber": "Data Scientist",
+        "kpmg": "Data Analyst",
         "trigent": "Frontend Developer",
     },
     "agentic_ai_engineering": {
@@ -3235,6 +3395,7 @@ def validate_model_payload(model_payload: dict) -> list[str]:
     if len(set(all_skill_items)) < max(len(all_skill_items) - 3, 1):
         issues.append("Updated skills repeat too many items across categories.")
     issues.extend(validate_agentic_data_storage(skills, analysis))
+    issues.extend(validate_data_role_skills(skills, analysis))
 
     if jd_terms:
         matched_skill_terms = 0
@@ -3342,6 +3503,7 @@ def validate_core_payload(core_payload: dict, analysis_payload: dict) -> list[st
     if len(skills) < 6:
         issues.append("Updated skills must contain at least 6 categories.")
     issues.extend(validate_agentic_data_storage(skills, analysis_payload))
+    issues.extend(validate_data_role_skills(skills, analysis_payload))
 
     seen_categories: set[str] = set()
     for entry in skills:
@@ -3436,6 +3598,7 @@ def validate_skills_only_payload(skills_payload: dict, analysis_payload: dict) -
     if len(skills) < 6:
         issues.append("Updated skills must contain at least 6 categories.")
     issues.extend(validate_agentic_data_storage(skills, analysis_payload))
+    issues.extend(validate_data_role_skills(skills, analysis_payload))
     seen_categories: set[str] = set()
     for entry in skills:
         category = str(entry.get("category", "")).strip()
@@ -3775,7 +3938,13 @@ def generate_skills_from_analysis(
         issue for issue in skill_issues
         if "vector store or embedding store" in issue
     ]
-    retryable_skill_issues = unsupported_tool_issues + generic_skill_issues + category_skill_issues + agentic_data_issues
+    data_role_issues = [
+        issue for issue in skill_issues
+        if issue.startswith("Data engineering skills should")
+        or issue.startswith("Data science skills should")
+        or issue.startswith("Data analyst skills should")
+    ]
+    retryable_skill_issues = unsupported_tool_issues + generic_skill_issues + category_skill_issues + agentic_data_issues + data_role_issues
     if retryable_skill_issues:
         retry_lines = [
             "Previous attempt used unsupported tools or generic skill phrases.",
@@ -3784,6 +3953,9 @@ def generate_skills_from_analysis(
             "Remove generic skill phrases and use named tools, platforms, languages, frameworks, databases, cloud services, or enterprise systems.",
             "Fix category placement issues by moving the item to the right category or replacing it with a concrete tool that fits the current category.",
             "For agentic AI roles, Data & Storage must include a concrete vector or embedding store such as Pinecone, Weaviate, Chroma, FAISS, pgvector, Milvus, or Qdrant when relevant.",
+            "For data engineering roles, include concrete warehouses/databases and orchestration/transformation tools such as Snowflake, BigQuery, Databricks, Airflow, Dagster, dbt, Spark, PySpark, AWS Glue, or Azure Data Factory.",
+            "For data science roles, include concrete ML/statistics tools and model platforms such as scikit-learn, pandas, NumPy, PyTorch, TensorFlow, XGBoost, MLflow, SageMaker, Vertex AI, or Databricks ML.",
+            "For data analyst roles, include concrete query and BI tools such as SQL, Excel, Python, Snowflake, BigQuery, Tableau, Power BI, Looker, Mode, Metabase, or Superset.",
             "If the JD does not mention a named tool for Tools & Platforms, use related enterprise platforms only when they fit the JD context, otherwise keep the category smaller.",
             "Fix these exact issues:",
             *[f"- {issue}" for issue in retryable_skill_issues],
