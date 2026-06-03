@@ -12,8 +12,9 @@
   --border-strong: rgba(255, 255, 255, 0.12);
   /* Text */
   --text: #f2f2f3;
-  --muted: #9b9ba3;
-  --subtle: #6c6c75;
+  /* Raised for WCAG AA contrast on --bg (was #9b9ba3 / #6c6c75, which failed) */
+  --muted: #bcbcc4;
+  --subtle: #9a9aa4;
   --primary: #ffffff;
   /* Accent */
   --accent: #10a37f;
@@ -243,7 +244,18 @@ button, input, textarea, select {
 .sidebar-fields {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.field-label:first-child {
+  margin-top: 0;
 }
 
 .sidebar-meta {
@@ -1421,6 +1433,12 @@ select:focus {
   margin-bottom: 12px;
 }
 
+.tracker-column-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 0;
+}
+
 .tracker-card-list {
   display: flex;
   flex: 1;
@@ -1586,4 +1604,56 @@ select:focus {
   .tracker-date-filters {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Tracker: JD detail + per-card actions ─────────────────────────────── */
+.tracker-card-links,
+.tracker-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tracker-table-actions {
+  margin-top: 0;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.jd-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.jd-detail-heading {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.jd-detail-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin: 0;
+  max-height: 52vh;
+  overflow-y: auto;
 }

@@ -1,0 +1,63 @@
+{
+  "active": "Sample Engineer",
+  "profiles": {
+    "Sample Engineer": {
+      "name": "Your Name",
+      "title": "Software Engineer",
+      "contact": {
+        "location": "City, ST",
+        "phone": "(000) 000-0000",
+        "email": "you@example.com",
+        "github": "github.com/yourhandle"
+      },
+      "summary": "Software Engineer with experience building and shipping production software. Replace this summary with your own, or let the generator tailor it to each job description.",
+      "technical_skills": [
+        { "category": "Programming Languages", "items": "Python, JavaScript, TypeScript, SQL" },
+        { "category": "Backend Engineering", "items": "Node.js, REST API design, PostgreSQL" },
+        { "category": "Cloud & Infrastructure", "items": "AWS, Docker, Kubernetes" }
+      ],
+      "experience": [
+        {
+          "company": "Most Recent Company",
+          "location": "City, ST",
+          "title": "Software Engineer",
+          "dates": "Jan 2023 – Present",
+          "bullets": [
+            "Describe a measurable impact you delivered, with a metric (e.g. cut latency from 3s to 280ms).",
+            "Describe a system you built or scaled, naming the key technologies you used.",
+            "Describe how you collaborated across teams or improved reliability/quality."
+          ]
+        },
+        {
+          "company": "Previous Company",
+          "location": "City, ST",
+          "title": "Software Engineer",
+          "dates": "Jun 2021 – Dec 2022",
+          "bullets": [
+            "Describe an earlier accomplishment with a concrete outcome.",
+            "Describe a technical problem you solved and the result."
+          ]
+        }
+      ],
+      "projects": [
+        {
+          "name": "Sample Project | Python, React, PostgreSQL",
+          "bullets": [
+            "One sentence on what the project does and the impact or scale.",
+            "One sentence on the key technical approach or result."
+          ]
+        }
+      ],
+      "education": [
+        {
+          "degree": "BS in Computer Science",
+          "institution": "Your University",
+          "dates": "2017 – 2021"
+        }
+      ],
+      "certifications": [
+        "AWS Certified Solutions Architect – Associate"
+      ]
+    }
+  }
+}

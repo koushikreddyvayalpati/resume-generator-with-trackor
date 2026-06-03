@@ -1,0 +1,14 @@
+{
+  "output_directory": "resumes",
+  "keep_docx": true,
+  "profile": {
+    "name": "Your Name",
+    "contact": {
+      "location": "City, ST",
+      "phone": "(000) 000-0000",
+      "email": "you@example.com"
+    },
+    "projects": [],
+    "certifications": []
+  }
+}

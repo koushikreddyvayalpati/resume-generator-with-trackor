@@ -67,6 +67,9 @@ resumes/*/
 config/profiles.json
 config/application_tracker.json
 config/settings.json
+config/base_resume.json
+# ...but always ship the example/templates so the app is clone-and-run
+!config/*.example.json
 
 # Local Claude Code launch config
 .claude/

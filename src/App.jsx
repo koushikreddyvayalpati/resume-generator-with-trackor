@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+// Secondary contact preset. Empty by default so the project ships without
+// personal data; users can fill this from the Identity panel.
 const gmailPreset = {
-  location: "Dallas, TX",
-  phone: "(469)963-5323",
-  email: "tmanikonda.1@gmail.com",
+  location: "",
+  phone: "",
+  email: "",
 };
 
 const emptyProfile = {
@@ -146,15 +148,72 @@ function ParsedPreview({ preview, loadingExperience }) {
   );
 }
 
+// Shared dialog accessibility: close on Escape, trap Tab focus within the
+// dialog, focus the first focusable element on open, and restore focus to the
+// previously-focused trigger on close.
+function useDialogA11y(open, onClose) {
+  const containerRef = useRef(null);
+  const previouslyFocused = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    previouslyFocused.current = document.activeElement;
+    const container = containerRef.current;
+
+    const getFocusable = () =>
+      container
+        ? Array.from(
+            container.querySelectorAll(
+              'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )
+          ).filter((el) => el.offsetParent !== null || el === document.activeElement)
+        : [];
+
+    // Move focus into the dialog.
+    const focusable = getFocusable();
+    if (focusable.length) focusable[0].focus();
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose?.();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const items = getFocusable();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      const prev = previouslyFocused.current;
+      if (prev && typeof prev.focus === "function") prev.focus();
+    };
+  }, [open, onClose]);
+
+  return containerRef;
+}
+
 function Modal({ open, title, onClose, children, footer }) {
+  const containerRef = useDialogA11y(open, onClose);
   if (!open) return null;
   return (
-    <div className="modal-shell" role="dialog" aria-modal="true">
-      <button className="modal-backdrop" onClick={onClose} aria-label="Close modal" />
-      <div className="modal-card">
+    <div className="modal-shell" role="dialog" aria-modal="true" aria-label={title}>
+      <button className="modal-backdrop" onClick={onClose} aria-label="Close modal" tabIndex={-1} />
+      <div className="modal-card" ref={containerRef}>
         <div className="modal-header">
           <h2>{title}</h2>
-          <button className="icon-button" onClick={onClose}>✕</button>
+          <button className="icon-button" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="modal-body">{children}</div>
         {footer ? <div className="modal-footer">{footer}</div> : null}
@@ -164,14 +223,15 @@ function Modal({ open, title, onClose, children, footer }) {
 }
 
 function SideDrawer({ open, title, onClose, children }) {
+  const containerRef = useDialogA11y(open, onClose);
   if (!open) return null;
   return (
-    <div className="drawer-shell" role="dialog" aria-modal="true">
-      <button className="drawer-backdrop" onClick={onClose} aria-label="Close drawer" />
-      <aside className="drawer-panel">
+    <div className="drawer-shell" role="dialog" aria-modal="true" aria-label={title}>
+      <button className="drawer-backdrop" onClick={onClose} aria-label="Close drawer" tabIndex={-1} />
+      <aside className="drawer-panel" ref={containerRef}>
         <div className="drawer-header">
           <h2>{title}</h2>
-          <button className="icon-button" onClick={onClose}>✕</button>
+          <button className="icon-button" onClick={onClose} aria-label="Close">✕</button>
         </div>
         <div className="drawer-body">{children}</div>
       </aside>
@@ -295,15 +355,15 @@ function dateValueForCompare(value) {
   return date.toISOString().slice(0, 10);
 }
 
-function TrackerBoard({ applications, statuses, onStatusChange }) {
+function TrackerBoard({ applications, statuses, onStatusChange, onView, onOpenPdf, onOpenFolder }) {
   return (
     <div className="tracker-board">
       {statuses.map((status) => {
         const items = applications.filter((item) => item.status === status);
         return (
-          <section key={status} className="tracker-column">
+          <section key={status} className="tracker-column" aria-label={`${status} (${items.length})`}>
             <div className="tracker-column-header">
-              <span>{status}</span>
+              <h3 className="tracker-column-title">{status}</h3>
               <span className="badge">{items.length}</span>
             </div>
             <div className="tracker-card-list">
@@ -330,9 +390,14 @@ function TrackerBoard({ applications, statuses, onStatusChange }) {
                     <span>{daysSince(item.status_updated_date || item.last_updated_date) ?? 0}d since update</span>
                   </div>
                   <div className="tracker-card-actions">
-                    <select value={item.status} onChange={(e) => onStatusChange(item.id, e.target.value)}>
+                    <select aria-label={`Status for ${item.company_name}`} value={item.status} onChange={(e) => onStatusChange(item.id, e.target.value)}>
                       {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
                     </select>
+                  </div>
+                  <div className="tracker-card-links">
+                    <button className="link-button" onClick={() => onView(item)} disabled={!item.job_description}>View JD</button>
+                    <button className="link-button" onClick={() => onOpenPdf(item)} disabled={!item.pdf_path}>Open PDF</button>
+                    <button className="link-button" onClick={() => onOpenFolder(item)} disabled={!item.output_dir}>Folder</button>
                   </div>
                 </article>
               )) : (
@@ -346,20 +411,21 @@ function TrackerBoard({ applications, statuses, onStatusChange }) {
   );
 }
 
-function TrackerTable({ applications, statuses, onStatusChange }) {
+function TrackerTable({ applications, statuses, onStatusChange, onView, onOpenPdf, onOpenFolder }) {
   return (
     <div className="tracker-table-shell">
       <table className="tracker-table">
         <thead>
           <tr>
-            <th>Company</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Applied</th>
-            <th>Last Update</th>
-            <th>Since Apply</th>
-            <th>Since Update</th>
-            <th>Resume</th>
+            <th scope="col">Company</th>
+            <th scope="col">Role</th>
+            <th scope="col">Status</th>
+            <th scope="col">Applied</th>
+            <th scope="col">Last Update</th>
+            <th scope="col">Since Apply</th>
+            <th scope="col">Since Update</th>
+            <th scope="col">Resume</th>
+            <th scope="col">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -381,10 +447,17 @@ function TrackerTable({ applications, statuses, onStatusChange }) {
               <td>{daysSince(item.applied_date) ?? "—"}d</td>
               <td>{daysSince(item.status_updated_date || item.last_updated_date) ?? "—"}d</td>
               <td>{item.resume_snapshot?.title || item.target_role || "Locked"}</td>
+              <td>
+                <div className="tracker-table-actions">
+                  <button className="link-button" onClick={() => onView(item)} disabled={!item.job_description}>JD</button>
+                  <button className="link-button" onClick={() => onOpenPdf(item)} disabled={!item.pdf_path}>PDF</button>
+                  <button className="link-button" onClick={() => onOpenFolder(item)} disabled={!item.output_dir}>Folder</button>
+                </div>
+              </td>
             </tr>
           )) : (
             <tr>
-              <td colSpan={8} className="tracker-empty-row">No applications tracked yet.</td>
+              <td colSpan={9} className="tracker-empty-row">No applications tracked yet.</td>
             </tr>
           )}
         </tbody>
@@ -416,6 +489,13 @@ export default function App() {
   const [aiError, setAiError] = useState("");
   const [showGeneratedArea, setShowGeneratedArea] = useState(false);
   const [latestAnalysis, setLatestAnalysis] = useState(null);
+  // Auto-fill the company name from the analysis so the user rarely retypes it.
+  useEffect(() => {
+    const detected = (latestAnalysis?.company_name || "").trim();
+    if (detected) {
+      setCompanyName((current) => (current.trim() ? current : detected));
+    }
+  }, [latestAnalysis]);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [reachoutLoading, setReachoutLoading] = useState(false);
   const [aiStage, setAiStage] = useState("");
@@ -444,7 +524,10 @@ export default function App() {
     query: "",
     applied_from: "",
     applied_to: "",
+    profile: "",
   });
+  // Application whose stored JD / analysis is being viewed in a modal.
+  const [trackerDetail, setTrackerDetail] = useState(null);
   const [trackApplyDraft, setTrackApplyDraft] = useState({
     applied_date: new Date().toISOString().slice(0, 10),
     source: "",
@@ -579,14 +662,28 @@ export default function App() {
 
   const statusBadgeClass = aiStatus.ready ? "badge status-ok" : "badge status-error";
   const jdModeLabel = showGeneratedArea ? "Current JD active" : "Waiting for new JD";
+  // Distinct profile/folder-group values present in the tracker, for the filter.
+  const trackerProfiles = useMemo(() => {
+    const set = new Set();
+    (trackerData.applications || []).forEach((item) => {
+      const group = String(item.folder_group || "").trim();
+      if (group) set.add(group);
+    });
+    return Array.from(set).sort();
+  }, [trackerData.applications]);
+
   const filteredTrackerApplications = useMemo(() => {
     const query = trackerFilters.query.trim().toLowerCase();
     const from = trackerFilters.applied_from;
     const to = trackerFilters.applied_to;
+    const profile = trackerFilters.profile;
     return (trackerData.applications || []).filter((item) => {
       const company = String(item.company_name || "").toLowerCase();
       const role = String(item.role_title || "").toLowerCase();
       if (query && !company.includes(query) && !role.includes(query)) {
+        return false;
+      }
+      if (profile && String(item.folder_group || "").trim() !== profile) {
         return false;
       }
       const applied = dateValueForCompare(item.applied_date);
@@ -596,6 +693,24 @@ export default function App() {
       return true;
     });
   }, [trackerData.applications, trackerFilters]);
+
+  // Open the generated PDF for a tracked application in a new tab.
+  const openTrackerPdf = (item) => {
+    const path = item?.pdf_path || "";
+    if (!path) return;
+    window.open(`/api/download?path=${encodeURIComponent(path)}&preview=true`, "_blank", "noopener");
+  };
+
+  // Reveal the application's output folder in the OS file browser.
+  const openTrackerFolder = (item) => {
+    const folder = item?.output_dir || "";
+    if (!folder) return;
+    fetchJson("/api/open-folder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: folder }),
+    }).catch(() => {});
+  };
 
   function openModal(name) {
     if (name === "settings") {
@@ -738,7 +853,7 @@ export default function App() {
       return;
     }
     if (!window.isSecureContext) {
-      setAiError("Microphone needs a secure context. Open the app at http://localhost:5001 (not via an IP address).");
+      setAiError(`Microphone needs a secure context. Open the app at ${window.location.origin} (use localhost, not a raw IP address).`);
       return;
     }
 
@@ -1035,9 +1150,12 @@ export default function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         content: generatedContent,
-        company_name: companyName,
+        company_name: companyName || latestAnalysis?.company_name || "",
         contact_override: contact,
         identity,
+        // Auto-capture into the tracker without a manual step.
+        job_description: lastGeneratedJd,
+        analysis: latestAnalysis || {},
       }),
     })
       .then((data) => {
@@ -1230,7 +1348,7 @@ export default function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-wrap">
-          <div className="brand-dot" />
+          <div className="brand-dot" aria-hidden="true" />
           <div className="brand">Resume Generator</div>
         </div>
         <div className="topbar-actions">
@@ -1331,6 +1449,7 @@ export default function App() {
                     <label className="composer-profile-select" title="Resume profile used when generating">
                       <span className="composer-profile-label">Profile</span>
                       <select
+                        aria-label="Resume profile used when generating"
                         value={profileList.active}
                         onChange={(e) => switchActiveProfile(e.target.value)}
                       >
@@ -1652,11 +1771,14 @@ export default function App() {
         </div>
 
         <div className="drawer-section">
-          <div className="sidebar-label">Contact</div>
-          <div className="sidebar-fields">
-            <input value={contact.location} onChange={(e) => setContact((current) => ({ ...current, location: e.target.value }))} placeholder="Location" />
-            <input value={contact.phone} onChange={(e) => setContact((current) => ({ ...current, phone: e.target.value }))} placeholder="Phone" />
-            <input value={contact.email} onChange={(e) => setContact((current) => ({ ...current, email: e.target.value }))} placeholder="Email" />
+          <div className="sidebar-label" id="contact-fields-label">Contact</div>
+          <div className="sidebar-fields" role="group" aria-labelledby="contact-fields-label">
+            <label className="field-label" htmlFor="contact-location">Location</label>
+            <input id="contact-location" value={contact.location} onChange={(e) => setContact((current) => ({ ...current, location: e.target.value }))} placeholder="City, ST" />
+            <label className="field-label" htmlFor="contact-phone">Phone</label>
+            <input id="contact-phone" value={contact.phone} onChange={(e) => setContact((current) => ({ ...current, phone: e.target.value }))} placeholder="(000) 000-0000" />
+            <label className="field-label" htmlFor="contact-email">Email</label>
+            <input id="contact-email" type="email" value={contact.email} onChange={(e) => setContact((current) => ({ ...current, email: e.target.value }))} placeholder="you@example.com" />
           </div>
         </div>
 
@@ -1752,6 +1874,20 @@ export default function App() {
                 onChange={(e) => setTrackerFilters((current) => ({ ...current, applied_to: e.target.value }))}
               />
             </label>
+            {trackerProfiles.length ? (
+              <label className="field">
+                Profile
+                <select
+                  value={trackerFilters.profile}
+                  onChange={(e) => setTrackerFilters((current) => ({ ...current, profile: e.target.value }))}
+                >
+                  <option value="">All profiles</option>
+                  {trackerProfiles.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
           </div>
         </div>
         <div className="tracker-toolbar">
@@ -1765,10 +1901,50 @@ export default function App() {
         {trackerLoading ? (
           <div className="blank-state">Loading tracker…</div>
         ) : trackerView === "board" ? (
-          <TrackerBoard applications={filteredTrackerApplications} statuses={trackerData.statuses} onStatusChange={updateTrackedStatus} />
+          <TrackerBoard
+            applications={filteredTrackerApplications}
+            statuses={trackerData.statuses}
+            onStatusChange={updateTrackedStatus}
+            onView={setTrackerDetail}
+            onOpenPdf={openTrackerPdf}
+            onOpenFolder={openTrackerFolder}
+          />
         ) : (
-          <TrackerTable applications={filteredTrackerApplications} statuses={trackerData.statuses} onStatusChange={updateTrackedStatus} />
+          <TrackerTable
+            applications={filteredTrackerApplications}
+            statuses={trackerData.statuses}
+            onStatusChange={updateTrackedStatus}
+            onView={setTrackerDetail}
+            onOpenPdf={openTrackerPdf}
+            onOpenFolder={openTrackerFolder}
+          />
         )}
+      </Modal>
+
+      <Modal
+        open={!!trackerDetail}
+        title={trackerDetail ? `${trackerDetail.company_name} — ${trackerDetail.role_title}` : "Application"}
+        onClose={() => setTrackerDetail(null)}
+        footer={
+          <div className="modal-actions">
+            <button className="secondary-button" onClick={() => openTrackerPdf(trackerDetail)} disabled={!trackerDetail?.pdf_path}>Open PDF</button>
+            <button className="secondary-button" onClick={() => openTrackerFolder(trackerDetail)} disabled={!trackerDetail?.output_dir}>Open Folder</button>
+            <button className="primary-button" onClick={() => setTrackerDetail(null)}>Close</button>
+          </div>
+        }
+      >
+        {trackerDetail ? (
+          <div className="jd-detail">
+            <div className="jd-detail-meta">
+              {trackerDetail.folder_group ? <span className="badge">Profile: {trackerDetail.folder_group}</span> : null}
+              {trackerDetail.role_family ? <span className="badge">{trackerDetail.role_family}</span> : null}
+              <span className="badge">Applied {formatDateShort(trackerDetail.applied_date)}</span>
+              <span className="badge">{trackerDetail.status}</span>
+            </div>
+            <h3 className="jd-detail-heading">Job Description</h3>
+            <pre className="jd-detail-text">{trackerDetail.job_description || "No job description stored for this application."}</pre>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

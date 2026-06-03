@@ -9,7 +9,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
@@ -67,9 +67,13 @@ def get_soffice_path():
 
     return None
 
-# Configuration - use environment variables with fallback defaults
-# Default to local resumes folder in project directory
-DEFAULT_TEMPLATE = str(_app_base_dir() / 'resumes' / 'Tharun Manikonda Resume.docx')
+# Configuration - use environment variables with fallback defaults.
+# The style-reference template lives in assets/ (outside the resumes output
+# dir) so it is portable and never confused with generated resumes or wiped
+# when clearing output. Falls back to the legacy location for old setups.
+_ASSET_TEMPLATE = _app_base_dir() / 'assets' / 'resume_template.docx'
+_LEGACY_TEMPLATE = _app_base_dir() / 'resumes' / 'Tharun Manikonda Resume.docx'
+DEFAULT_TEMPLATE = str(_ASSET_TEMPLATE if _ASSET_TEMPLATE.exists() else _LEGACY_TEMPLATE)
 TEMPLATE_PATH = os.getenv("RESUME_TEMPLATE_PATH", DEFAULT_TEMPLATE)
 BULLET = "●"
 TEXT_W = 7.884   # usable width (A4 8.278" − 2 × 0.197")
@@ -259,35 +263,38 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
     d = resume_data
 
     # ── NAME ──────────────────────────────────────────────────────────────
-    doc.add_paragraph(d['name'], style='Title')
-
-    # ── PROFESSIONAL TITLE ────────────────────────────────────────────────
-    p = doc.add_paragraph(style='Normal')
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.space_before = Pt(2.2)
-    p.paragraph_format.space_after  = Pt(0)
-    r = p.add_run(d['title'])
-    _format_run(r, size=profile["title_size"], font_name=font_name)
-    r.bold      = True
+    p_name = doc.add_paragraph(d['name'], style='Title')
+    p_name.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for run in p_name.runs:
+        run.font.color.rgb = RGBColor(192, 0, 0)  # Red color
 
     # ── CONTACT LINE ──────────────────────────────────────────────────────
     c  = d['contact']
-    p  = doc.add_paragraph(style='Normal')
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.space_before = Pt(2.2)
-    p.paragraph_format.space_after  = Pt(0)
-    r  = p.add_run(f"{c['location']} | {c['phone']} | {c['email']}")
+    p_contact = doc.add_paragraph(style='Normal')
+    p_contact.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_contact.paragraph_format.space_before = Pt(0)
+    p_contact.paragraph_format.space_after  = Pt(6)
+    # Order: phone | email | github/location
+    contact_str = f"{c['phone']} | {c['email']}"
+    if c.get('github'):
+        contact_str += f" | {c['github']}"
+    elif c.get('location'):
+        contact_str += f" | {c['location']}"
+    r = p_contact.add_run(contact_str)
     _format_run(r, size=profile["contact_size"], font_name=font_name)
-
-    _spacer(doc, after_pt=6)
 
     # ── SUMMARY ───────────────────────────────────────────────────────────
     p_h = doc.add_paragraph('SUMMARY', style='Heading 1')
     p_h.paragraph_format.space_before = Pt(profile["section_spacing_before"])
+    p_h.paragraph_format.space_after = Pt(4)
     _add_section_borders(p_h)
+    for run in p_h.runs:
+        run.font.color.rgb = RGBColor(192, 0, 0)  # Red
+        run.bold = True
+
     p = doc.add_paragraph(style='Normal')
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p.paragraph_format.space_before = Pt(profile["summary_spacing_before"])
+    p.paragraph_format.space_before = Pt(2)
     p.paragraph_format.space_after = Pt(0)
     _runs(p, d['summary'], size=body_size, font_name=font_name)
 
@@ -295,7 +302,12 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
 
     # ── TECHNICAL SKILLS ──────────────────────────────────────────────────
     p_h = doc.add_paragraph('TECHNICAL SKILLS', style='Heading 1')
+    p_h.paragraph_format.space_after = Pt(4)
     _add_section_borders(p_h)
+    for run in p_h.runs:
+        run.font.color.rgb = RGBColor(192, 0, 0)  # Red
+        run.bold = True
+
     for sk in d['technical_skills']:
         p = doc.add_paragraph(style='p1')
         _set_compact_spacing(p)
@@ -307,29 +319,31 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
 
     # ── PROFESSIONAL EXPERIENCE ───────────────────────────────────────────
     p_h = doc.add_paragraph('PROFESSIONAL EXPERIENCE', style='Heading 1')
+    p_h.paragraph_format.space_after = Pt(4)
     _add_section_borders(p_h)
+    for run in p_h.runs:
+        run.font.color.rgb = RGBColor(192, 0, 0)  # Red
+        run.bold = True
+
     for i, exp in enumerate(d['experience']):
+
+        # Title (bold) [TAB] Dates on right
+        p = doc.add_paragraph(style='Normal')
+        p.paragraph_format.space_before = Pt(profile["experience_gap"] if i > 0 else 1.9)
+        p.paragraph_format.space_after  = Pt(0)
+        _add_right_tab(p, profile["text_width"])
+        r1 = p.add_run(exp['title'])
+        _format_run(r1, size=body_size, font_name=font_name)
+        r1.bold = True
+        p.add_run('\t')
+        r2 = p.add_run(exp['dates'])
+        _format_run(r2, size=body_size, font_name=font_name)
 
         # Company | Location
         p = doc.add_paragraph(f"{exp['company']} | {exp['location']}",
                                style='Heading 2')
-        p.paragraph_format.space_before = Pt(profile["experience_gap"] if i > 0 else 1.9)
-
-        # Title [TAB] Dates  — right-tab aligned, bold-italic
-        p = doc.add_paragraph(style='Normal')
-        p.paragraph_format.space_before = Pt(1.9)
-        p.paragraph_format.space_after  = Pt(0)
-        p.paragraph_format.left_indent  = Inches(0.085)
-        _add_right_tab(p, profile["text_width"])
-        r1 = p.add_run(exp['title'])
-        _format_run(r1, size=body_size, font_name=font_name)
-        r1.bold      = True
-        r1.italic    = True
-        p.add_run('\t')
-        r2 = p.add_run(exp['dates'])
-        _format_run(r2, size=body_size, font_name=font_name)
-        r2.bold      = True
-        r2.italic    = True
+        p.paragraph_format.space_before = Pt(1.2)
+        p.paragraph_format.space_after = Pt(3)
 
         # Bullet points
         for b in exp['bullets']:
@@ -346,10 +360,16 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
 
     # ── PROJECTS ──────────────────────────────────────────────────────────
     p_h = doc.add_paragraph('PROJECTS', style='Heading 1')
+    p_h.paragraph_format.space_after = Pt(4)
     _add_section_borders(p_h)
+    for run in p_h.runs:
+        run.font.color.rgb = RGBColor(192, 0, 0)  # Red
+        run.bold = True
+
     for proj in d['projects']:
         p = doc.add_paragraph(proj['name'], style='Heading 2')
         p.paragraph_format.space_before = Pt(profile["project_gap"])
+        p.paragraph_format.space_after = Pt(3)
 
         for b in proj['bullets']:
             p = doc.add_paragraph(style='Body Text')
@@ -363,14 +383,20 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
 
     # ── EDUCATION ─────────────────────────────────────────────────────────
     p_h = doc.add_paragraph('EDUCATION', style='Heading 1')
+    p_h.paragraph_format.space_after = Pt(4)
     _add_section_borders(p_h)
+    for run in p_h.runs:
+        run.font.color.rgb = RGBColor(192, 0, 0)  # Red
+        run.bold = True
+
     for edu in d['education']:
         p = doc.add_paragraph(edu['degree'], style='Heading 2')
         p.paragraph_format.space_before = Pt(1.9)
+        p.paragraph_format.space_after = Pt(1)
 
         # Institution [TAB] Dates
         p = doc.add_paragraph(style='Normal')
-        p.paragraph_format.space_before = Pt(2.1)
+        p.paragraph_format.space_before = Pt(1)
         p.paragraph_format.space_after  = Pt(0)
         p.paragraph_format.left_indent  = Inches(0.053)
         _add_right_tab(p, profile["text_width"])
@@ -379,13 +405,17 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
         p.add_run('\t')
         r2 = p.add_run(edu['dates'])
         _format_run(r2, size=body_size, font_name=font_name)
-        r2.italic    = True
 
     _spacer(doc, after_pt=5)
 
     # ── CERTIFICATIONS ────────────────────────────────────────────────────
     p_h = doc.add_paragraph('CERTIFICATIONS', style='Heading 1')
+    p_h.paragraph_format.space_after = Pt(4)
     _add_section_borders(p_h)
+    for run in p_h.runs:
+        run.font.color.rgb = RGBColor(192, 0, 0)  # Red
+        run.bold = True
+
     for cert in d['certifications']:
         p = doc.add_paragraph(style='List Paragraph')
         p.paragraph_format.space_before = Pt(2.25)

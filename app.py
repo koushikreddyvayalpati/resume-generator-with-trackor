@@ -9,6 +9,7 @@ import copy
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -24,6 +25,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from desktop_runtime import (
+    app_base_dir,
     default_output_dir,
     load_json_file,
     open_path,
@@ -49,10 +51,50 @@ OUTPUT_ROOT = os.getenv("OUTPUT_ROOT", DEFAULT_OUTPUT_ROOT)
 SETTINGS_FILE = settings_path()
 TRACKER_FILE = resource_path("config", "application_tracker.json")
 
+def _resolve_output_directory(value: str) -> str:
+    """Resolve a configured output directory to an absolute, usable path.
+
+    Makes the app clone-and-run portable: relative paths (e.g. "resumes")
+    resolve against the app base dir, and an unusable absolute path (e.g. a
+    previous user's home directory) falls back to the default local resumes
+    folder so a fresh clone never has to edit config files.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return DEFAULT_OUTPUT_ROOT
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = Path(app_base_dir()) / path
+    parent = path if path.exists() else path.parent
+    # If the target (or its parent) isn't a writable location on this machine,
+    # fall back to the portable default.
+    try:
+        if parent.exists() and os.access(parent, os.W_OK):
+            return str(path)
+    except OSError:
+        pass
+    return DEFAULT_OUTPUT_ROOT
+
+
+def _bootstrap_config_from_example(target: Path, example_name: str) -> None:
+    """On first run, seed a missing config file from its committed example."""
+    if target.exists():
+        return
+    example = resource_path("config", example_name)
+    try:
+        if Path(example).exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(example, target)
+    except OSError:
+        pass
+
+
 def load_settings():
     """Load settings from config/settings.json, fall back to env var if missing."""
+    _bootstrap_config_from_example(Path(SETTINGS_FILE), "settings.example.json")
     loaded_settings = load_json_file(Path(SETTINGS_FILE), {"output_directory": OUTPUT_ROOT})
     loaded_settings.setdefault("output_directory", OUTPUT_ROOT)
+    loaded_settings["output_directory"] = _resolve_output_directory(loaded_settings["output_directory"])
     loaded_settings.setdefault("keep_docx", True)
     loaded_settings.setdefault("profile", {})
     return loaded_settings
@@ -687,6 +729,61 @@ def load_tracker_store() -> dict:
 
 def save_tracker_store(store: dict) -> None:
     write_json_file(Path(TRACKER_FILE), {"applications": store.get("applications", [])})
+    # Any persisted write may invalidate the cached disk scan.
+    invalidate_tracker_scan_cache()
+
+
+def upsert_tracker_application(store: dict, record: dict) -> tuple[dict, bool]:
+    """Insert a tracker record, or update the existing one that shares the
+    same output_dir. Returns (store, created) where created is False on update.
+
+    Used so generation can auto-capture an application without creating
+    duplicates when the user regenerates the same resume.
+    """
+    applications = store.setdefault("applications", [])
+    target_dir = str(record.get("output_dir", "")).strip()
+    if target_dir:
+        for idx, existing in enumerate(applications):
+            if str(existing.get("output_dir", "")).strip() == target_dir:
+                # Preserve user-managed fields and history across regeneration.
+                merged = dict(record)
+                merged["id"] = existing.get("id", record["id"])
+                merged["created_at"] = existing.get("created_at", record["created_at"])
+                merged["history"] = existing.get("history", record.get("history", []))
+                for keep in ("status", "applied_date", "status_updated_date", "source", "job_url", "notes"):
+                    if existing.get(keep):
+                        merged[keep] = existing[keep]
+                applications[idx] = merged
+                return store, False
+    applications.append(record)
+    return store, True
+
+
+def stable_folder_name(title: str) -> str:
+    """Sanitize a folder name WITHOUT appending a dedup counter.
+
+    Used so regenerating a resume for the same company + role reuses the same
+    folder (overwriting the prior PDF) instead of creating "(1)", "(2)" copies.
+    """
+    name = (title or "").strip() or "Resume"
+    name = re.sub(r'[\\/*?:"<>|→]', " ", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    if len(name) > 100:
+        name = name[:97] + "..."
+    return name
+
+
+def safe_profile_folder(name: str) -> str:
+    """Sanitize a profile name for use as a folder segment.
+
+    Mirrors the filesystem-unsafe-char handling used elsewhere so each
+    profile's resumes live under resumes/<profile>/.
+    """
+    cleaned = re.sub(r'[\\/*?:"<>|→]', " ", str(name or "").strip())
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        cleaned = "Default"
+    return cleaned[:80]
 
 
 def today_iso_date() -> str:
@@ -866,8 +963,38 @@ def infer_application_from_output_dir(folder: Path, output_root: Path | None = N
     }
 
 
+# Cache for the (potentially expensive) full resumes-tree scan. Invalidated
+# whenever the tracker store is written, or when the output root's mtime
+# changes (covers folders created/removed outside the app).
+_tracker_scan_cache = {"result": None, "root_mtime": None, "token": 0}
+
+
+def invalidate_tracker_scan_cache() -> None:
+    _tracker_scan_cache["result"] = None
+    _tracker_scan_cache["token"] += 1
+
+
 def scan_output_tracker_applications() -> list[dict]:
     output_root = Path(settings["output_directory"]).expanduser().resolve()
+    if not output_root.exists():
+        return []
+
+    try:
+        root_mtime = output_root.stat().st_mtime
+    except OSError:
+        root_mtime = None
+
+    cached = _tracker_scan_cache["result"]
+    if cached is not None and _tracker_scan_cache["root_mtime"] == root_mtime:
+        return cached
+
+    result = _scan_output_tracker_applications_uncached(output_root)
+    _tracker_scan_cache["result"] = result
+    _tracker_scan_cache["root_mtime"] = root_mtime
+    return result
+
+
+def _scan_output_tracker_applications_uncached(output_root: Path) -> list[dict]:
     if not output_root.exists():
         return []
 
@@ -4366,7 +4493,22 @@ def load_profiles_store() -> dict:
                 return data
         except Exception:
             pass
-    # Seed from the legacy base_resume.json so existing setups are preserved.
+    # Fresh clone: seed from the shipped example profile so the app is usable
+    # immediately without editing config files.
+    example_path = resource_path("config", "profiles.example.json")
+    try:
+        if Path(example_path).exists():
+            example_data = json.loads(Path(example_path).read_text(encoding="utf-8"))
+            if (
+                isinstance(example_data, dict)
+                and isinstance(example_data.get("profiles"), dict)
+                and example_data.get("active") in example_data["profiles"]
+            ):
+                save_profiles_store(example_data)
+                return example_data
+    except Exception:
+        pass
+    # Otherwise seed from the legacy base_resume.json so existing setups are preserved.
     seed = _read_legacy_base_resume()
     store = {"active": "Profile 1", "profiles": {"Profile 1": seed}}
     save_profiles_store(store)
@@ -5797,14 +5939,19 @@ def generate():
                 },
             }
 
-        # Create output directory
+        # Create output directory — grouped per active profile so each persona's
+        # resumes live under resumes/<profile>/<Company> - <Title>/.
         title = merged_resume.get("title", "Resume")
         company_name = data.get("company_name", "").strip()
+        profile_folder = safe_profile_folder(get_active_profile_name())
+        profile_dir = Path(settings["output_directory"]) / profile_folder
         # Use custom folder name if provided, otherwise generate from title
         custom_folder = data.get("folder_name", "").strip()
         folder_source = display_folder_name(company_name, title, custom_folder)
-        folder_name = safe_folder_name(folder_source, settings["output_directory"])
-        out_dir = Path(settings["output_directory"]) / folder_name
+        # Reuse the same folder for the same company + role (overwrite), rather
+        # than creating "(1)", "(2)" copies on regeneration.
+        folder_name = stable_folder_name(folder_source)
+        out_dir = profile_dir / folder_name
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # Build DOCX
@@ -5817,6 +5964,7 @@ def generate():
         status_path = out_dir / "pdf_status.json"
         metadata = {
             "folder": folder_name,
+            "profile": profile_folder,
             "company_name": company_name,
             "identity": identity,
             "title": title,
@@ -5826,6 +5974,32 @@ def generate():
             "status_path": str(status_path),
             "output_dir": str(out_dir),
         }
+
+        # Auto-capture this application into the tracker so the user doesn't
+        # have to re-enter the JD/analysis manually. The JD + analysis are
+        # already in app state and passed in the request.
+        try:
+            job_description = str(data.get("job_description", "") or "").strip()
+            analysis_payload = data.get("analysis") if isinstance(data.get("analysis"), dict) else None
+            if job_description or analysis_payload or company_name:
+                record = build_tracker_application_record(
+                    company_name=company_name,
+                    job_description=job_description,
+                    resume_content=content,
+                    analysis_payload=analysis_payload,
+                    applied_date=today_iso_date(),
+                    status="Applied",
+                    pdf_path=str(pdf_path),
+                    output_dir=str(out_dir),
+                    contact_override=contact_override if isinstance(contact_override, dict) else None,
+                    identity=identity,
+                )
+                tracker_store = load_tracker_store()
+                upsert_tracker_application(tracker_store, record)
+                save_tracker_store(tracker_store)
+        except Exception as tracker_error:
+            # Never fail resume generation because of tracker bookkeeping.
+            print(f"Auto-tracker capture failed: {tracker_error}")
 
         # Launch background PDF conversion.
         start_pdf_conversion(docx_path, pdf_path, status_path)

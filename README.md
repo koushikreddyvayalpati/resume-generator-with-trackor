@@ -1,16 +1,34 @@
 # Resume Generator
 
-A Flask-based resume generator with real-time preview and PDF export.
+A Flask + React resume generator that tailors your resume to a job description,
+exports to PDF, and tracks every application — with the job description saved
+automatically.
 
 ## Features
 
-- **Real-time Preview** — See parsed resume as you type
-- **Auto-Validation** — Instant feedback on resume content
-- **PDF Generation** — Convert DOCX to PDF automatically
-- **Settings Modal** — Configure output directory at runtime
-- **Directory Picker** — Browse file system to select save location
-- **Modern UI** — Clean, responsive design with dark mode
-- **Hardcoded Company Data** — Consistent work history across exports
+- **JD-tailored generation** — Paste a job description; the AI rewrites your
+  title, summary, skills, and experience to match it
+- **Multiple profiles** — Keep separate personas (e.g. Security, Backend, AI)
+  and switch between them per generation
+- **Per-profile storage** — Resumes are saved under `resumes/<profile>/<Company> - <Title>/`
+- **Application tracker** — Each generation is auto-captured with the full job
+  description and analysis; view the JD, re-open the PDF, and filter by profile
+- **Real-time preview** + **DOCX → PDF export** (via LibreOffice)
+- **Voice input** — Dictate job descriptions and revisions
+- **Accessible, dark-mode UI**
+
+## First-time setup
+
+You need an **OpenAI API key**. Copy the example env file and add yours:
+
+```bash
+cp .env.example .env
+# then edit .env and set OPENAI_API_KEY=sk-...
+```
+
+Config files (`config/settings.json`, `config/profiles.json`,
+`config/application_tracker.json`) are created automatically on first run from
+the committed `config/*.example.json` templates — no manual editing required.
 
 ## Quick Start
 
