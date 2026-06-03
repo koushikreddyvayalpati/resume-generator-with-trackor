@@ -154,6 +154,11 @@ function ParsedPreview({ preview, loadingExperience }) {
 function useDialogA11y(open, onClose) {
   const containerRef = useRef(null);
   const previouslyFocused = useRef(null);
+  // Keep the latest onClose without making it an effect dependency, so the
+  // effect runs only on open/close transitions (not on every parent re-render,
+  // which would steal focus out of inputs after a single keystroke).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return undefined;
@@ -176,7 +181,7 @@ function useDialogA11y(open, onClose) {
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose?.();
+        onCloseRef.current?.();
         return;
       }
       if (event.key !== "Tab") return;
@@ -199,7 +204,7 @@ function useDialogA11y(open, onClose) {
       const prev = previouslyFocused.current;
       if (prev && typeof prev.focus === "function") prev.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return containerRef;
 }
