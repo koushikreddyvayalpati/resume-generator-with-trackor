@@ -85,11 +85,11 @@ FORMAT_PROFILES = {
         "title_size": 14,
         "contact_size": 10,
         "body_size": 10,
-        "summary_spacing_before": 6,
-        "section_spacing_before": 6,
-        "experience_gap": 8.3,
-        "project_gap": 13.6,
-        "bullet_spacing": 2.25,
+        "summary_spacing_before": 4,
+        "section_spacing_before": 4,
+        "experience_gap": 5,
+        "project_gap": 6,
+        "bullet_spacing": 2,
         "text_width": TEXT_W,
     },
     "gmail": {
@@ -103,11 +103,11 @@ FORMAT_PROFILES = {
         "title_size": 13,
         "contact_size": 9.5,
         "body_size": 9.8,
-        "summary_spacing_before": 4,
-        "section_spacing_before": 4,
-        "experience_gap": 6,
-        "project_gap": 9,
-        "bullet_spacing": 1.6,
+        "summary_spacing_before": 3,
+        "section_spacing_before": 3,
+        "experience_gap": 4,
+        "project_gap": 5,
+        "bullet_spacing": 1.4,
         "text_width": 7.718,
     },
 }
@@ -137,6 +137,13 @@ def _apply_document_profile(doc, profile: dict) -> None:
                 continue
             style.font.name = font_name
             _set_font_name(style._element.get_or_add_rPr(), font_name)
+
+    # Left-align section headers (template defaults them centered). The name
+    # and contact stay centered — set explicitly on those paragraphs.
+    try:
+        doc.styles["Heading 1"].paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    except (KeyError, AttributeError):
+        pass
 
     margins = profile.get("margins")
     if margins:
@@ -186,7 +193,44 @@ def _runs(para, text, size=10, font_name=None):
                 r.font.bold = False
 
 
-def _spacer(doc, after_pt=5):
+def _remove_table_borders(table) -> None:
+    """Ensure a table renders with no visible borders (used for layout grids)."""
+    tbl_pr = table._element.tblPr
+    if tbl_pr is None:
+        tbl_pr = OxmlElement('w:tblPr')
+        table._element.insert(0, tbl_pr)
+    borders = tbl_pr.find(qn('w:tblBorders'))
+    if borders is None:
+        borders = OxmlElement('w:tblBorders')
+        tbl_pr.append(borders)
+    for edge in ('top', 'left', 'bottom', 'right', 'insideH', 'insideV'):
+        el = borders.find(qn(f'w:{edge}'))
+        if el is None:
+            el = OxmlElement(f'w:{edge}')
+            borders.append(el)
+        el.set(qn('w:val'), 'none')
+        el.set(qn('w:sz'), '0')
+        el.set(qn('w:space'), '0')
+
+
+def _tighten_cell_margins(cell, left_twips=0, right_twips=70) -> None:
+    """Reduce a table cell's inner left/right padding so column text aligns
+    with the rest of the document and the two columns sit close together."""
+    tc_pr = cell._tc.get_or_add_tcPr()
+    margins = tc_pr.find(qn('w:tcMar'))
+    if margins is None:
+        margins = OxmlElement('w:tcMar')
+        tc_pr.append(margins)
+    for edge, val in (('left', left_twips), ('right', right_twips)):
+        el = margins.find(qn(f'w:{edge}'))
+        if el is None:
+            el = OxmlElement(f'w:{edge}')
+            margins.append(el)
+        el.set(qn('w:w'), str(val))
+        el.set(qn('w:type'), 'dxa')
+
+
+def _spacer(doc, after_pt=3):
     """Insert a blank Body Text paragraph used as vertical spacer."""
     p = doc.add_paragraph(style='Body Text')
     p.paragraph_format.space_before = Pt(0)
@@ -265,6 +309,8 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
     # ── NAME ──────────────────────────────────────────────────────────────
     p_name = doc.add_paragraph(d['name'], style='Title')
     p_name.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_name.paragraph_format.space_before = Pt(0)
+    p_name.paragraph_format.space_after = Pt(0)
     for run in p_name.runs:
         run.font.color.rgb = RGBColor(192, 0, 0)  # Red color
 
@@ -273,7 +319,7 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
     p_contact = doc.add_paragraph(style='Normal')
     p_contact.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_contact.paragraph_format.space_before = Pt(0)
-    p_contact.paragraph_format.space_after  = Pt(6)
+    p_contact.paragraph_format.space_after  = Pt(3)
     # Order: phone | email | github/location
     contact_str = f"{c['phone']} | {c['email']}"
     if c.get('github'):
@@ -285,8 +331,8 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
 
     # ── SUMMARY ───────────────────────────────────────────────────────────
     p_h = doc.add_paragraph('SUMMARY', style='Heading 1')
-    p_h.paragraph_format.space_before = Pt(profile["section_spacing_before"])
-    p_h.paragraph_format.space_after = Pt(4)
+    p_h.paragraph_format.space_before = Pt(3)
+    p_h.paragraph_format.space_after = Pt(3)
     _add_section_borders(p_h)
     for run in p_h.runs:
         run.font.color.rgb = RGBColor(192, 0, 0)  # Red
@@ -294,32 +340,52 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
 
     p = doc.add_paragraph(style='Normal')
     p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    p.paragraph_format.space_before = Pt(2)
+    p.paragraph_format.space_before = Pt(1)
     p.paragraph_format.space_after = Pt(0)
     _runs(p, d['summary'], size=body_size, font_name=font_name)
 
-    _spacer(doc, after_pt=6)
+    _spacer(doc, after_pt=3)
 
     # ── TECHNICAL SKILLS ──────────────────────────────────────────────────
     p_h = doc.add_paragraph('TECHNICAL SKILLS', style='Heading 1')
-    p_h.paragraph_format.space_after = Pt(4)
+    p_h.paragraph_format.space_after = Pt(3)
     _add_section_borders(p_h)
     for run in p_h.runs:
         run.font.color.rgb = RGBColor(192, 0, 0)  # Red
         run.bold = True
 
-    for sk in d['technical_skills']:
-        p = doc.add_paragraph(style='p1')
-        _set_compact_spacing(p)
-        r1 = p.add_run(sk['category'])
-        _format_run(r1, size=body_size, font_name=font_name)
-        r1.bold      = True
-        r2 = p.add_run(f": {sk['items']}")
-        _format_run(r2, size=body_size, font_name=font_name)
+    # Render skill categories in two balanced columns to save vertical space.
+    skills = [sk for sk in d['technical_skills'] if str(sk.get('category', '')).strip()]
+    if skills:
+        half = (len(skills) + 1) // 2  # left column takes the extra when odd
+        columns = [skills[:half], skills[half:]]
+
+        skills_table = doc.add_table(rows=1, cols=2)
+        skills_table.autofit = False
+        skills_table.allow_autofit = False
+        gutter_in = 0.22
+        col_w = (profile["text_width"] - gutter_in) / 2
+        _remove_table_borders(skills_table)
+
+        for col_idx, entries in enumerate(columns):
+            cell = skills_table.cell(0, col_idx)
+            cell.width = Inches(col_w)
+            _tighten_cell_margins(cell)
+            first = True
+            for sk in entries:
+                p = cell.paragraphs[0] if first else cell.add_paragraph()
+                first = False
+                p.style = doc.styles['p1']
+                _set_compact_spacing(p)
+                r1 = p.add_run(sk['category'])
+                _format_run(r1, size=body_size, font_name=font_name)
+                r1.bold = True
+                r2 = p.add_run(f": {sk['items']}")
+                _format_run(r2, size=body_size, font_name=font_name)
 
     # ── PROFESSIONAL EXPERIENCE ───────────────────────────────────────────
     p_h = doc.add_paragraph('PROFESSIONAL EXPERIENCE', style='Heading 1')
-    p_h.paragraph_format.space_after = Pt(4)
+    p_h.paragraph_format.space_after = Pt(3)
     _add_section_borders(p_h)
     for run in p_h.runs:
         run.font.color.rgb = RGBColor(192, 0, 0)  # Red
@@ -356,11 +422,11 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
             _format_run(r, size=body_size, font_name=font_name)
             _runs(p, b, size=body_size, font_name=font_name)
 
-    _spacer(doc, after_pt=5)
+    _spacer(doc, after_pt=3)
 
     # ── PROJECTS ──────────────────────────────────────────────────────────
     p_h = doc.add_paragraph('PROJECTS', style='Heading 1')
-    p_h.paragraph_format.space_after = Pt(4)
+    p_h.paragraph_format.space_after = Pt(3)
     _add_section_borders(p_h)
     for run in p_h.runs:
         run.font.color.rgb = RGBColor(192, 0, 0)  # Red
@@ -379,11 +445,11 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
             _format_run(r, size=body_size, font_name=font_name)
             _runs(p, b, size=body_size, font_name=font_name)
 
-    _spacer(doc, after_pt=5)
+    _spacer(doc, after_pt=3)
 
     # ── EDUCATION ─────────────────────────────────────────────────────────
     p_h = doc.add_paragraph('EDUCATION', style='Heading 1')
-    p_h.paragraph_format.space_after = Pt(4)
+    p_h.paragraph_format.space_after = Pt(3)
     _add_section_borders(p_h)
     for run in p_h.runs:
         run.font.color.rgb = RGBColor(192, 0, 0)  # Red
@@ -406,11 +472,11 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
         r2 = p.add_run(edu['dates'])
         _format_run(r2, size=body_size, font_name=font_name)
 
-    _spacer(doc, after_pt=5)
+    _spacer(doc, after_pt=3)
 
     # ── CERTIFICATIONS ────────────────────────────────────────────────────
     p_h = doc.add_paragraph('CERTIFICATIONS', style='Heading 1')
-    p_h.paragraph_format.space_after = Pt(4)
+    p_h.paragraph_format.space_after = Pt(3)
     _add_section_borders(p_h)
     for run in p_h.runs:
         run.font.color.rgb = RGBColor(192, 0, 0)  # Red

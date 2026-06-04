@@ -4656,12 +4656,10 @@ def current_profile() -> dict:
     saved_contact = saved_profile.get("contact") or {}
     profile["contact"].update({k: v for k, v in saved_contact.items() if v})
 
-    if isinstance(saved_profile.get("projects"), list):
-        profile["projects"] = saved_profile["projects"]
-
-    if isinstance(saved_profile.get("certifications"), list):
-        profile["certifications"] = saved_profile["certifications"]
-
+    # Projects and certifications come solely from the active profile
+    # (profiles.json) so edits in the profile editor are reflected in the PDF.
+    # The legacy settings.json "profile" block is intentionally NOT used here —
+    # it caused every profile to render the same hardcoded projects.
     return profile
 
 
@@ -4750,7 +4748,7 @@ def apply_base_resume_edits(payload: dict) -> bool:
     Only keys present in the payload are touched; everything else is
     preserved exactly as it was. Returns True if anything was written.
     """
-    structural_keys = ("title", "summary", "experience", "technical_skills", "education")
+    structural_keys = ("title", "summary", "experience", "technical_skills", "education", "projects", "certifications")
     if not any(key in payload for key in structural_keys):
         return False
 
@@ -4771,6 +4769,25 @@ def apply_base_resume_edits(payload: dict) -> bool:
         changed = True
     if "education" in payload:
         base_resume["education"] = normalize_education_entries(payload.get("education"))
+        changed = True
+    # Projects and certifications now persist into the active profile too, so
+    # edits in the profile editor flow into the generated PDF (previously they
+    # only went to settings.json, which generation no longer reads).
+    if "projects" in payload:
+        normalized_projects = []
+        for project in payload.get("projects") or []:
+            if not isinstance(project, dict):
+                continue
+            name = str(project.get("name", "")).strip()
+            bullets = [str(item).strip() for item in project.get("bullets", []) if str(item).strip()]
+            if name:
+                normalized_projects.append({"name": name, "bullets": bullets})
+        base_resume["projects"] = normalized_projects
+        changed = True
+    if "certifications" in payload:
+        base_resume["certifications"] = [
+            str(item).strip() for item in (payload.get("certifications") or []) if str(item).strip()
+        ]
         changed = True
 
     if changed:

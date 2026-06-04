@@ -1199,15 +1199,18 @@ export default function App() {
   }
 
   function saveProfile() {
-    const certifications = Array.isArray(profileDraft.certifications)
-      ? profileDraft.certifications.map((c) => String(c || "").trim()).filter(Boolean)
-      : (profileDraft.certificationsText || "")
-          .split("\n")
-          .map((line) => line.trim())
-          .filter(Boolean);
-    const projects = Array.isArray(profileDraft.projects) && profileDraft.projects.length
-      ? profileDraft.projects
-      : parseProjects(profileDraft.projectsText || "");
+    // The Projects/Certifications editors are textareas bound to *Text fields,
+    // so those are the source of truth. Parse them when present; only fall back
+    // to the original arrays if the textarea was never initialized. (Previously
+    // the arrays won, so edits to the textareas were silently discarded.)
+    const certifications = typeof profileDraft.certificationsText === "string"
+      ? profileDraft.certificationsText.split("\n").map((line) => line.trim()).filter(Boolean)
+      : (Array.isArray(profileDraft.certifications)
+          ? profileDraft.certifications.map((c) => String(c || "").trim()).filter(Boolean)
+          : []);
+    const projects = typeof profileDraft.projectsText === "string"
+      ? parseProjects(profileDraft.projectsText)
+      : (Array.isArray(profileDraft.projects) ? profileDraft.projects : []);
     const payload = {
       name: profileDraft.name || "",
       contact: profileDraft.contact || emptyProfile.contact,
