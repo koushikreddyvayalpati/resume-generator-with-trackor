@@ -10,7 +10,7 @@ const gmailPreset = {
 
 const emptyProfile = {
   name: "",
-  contact: { location: "", phone: "", email: "" },
+  contact: { location: "", phone: "", email: "", github: "" },
   certifications: [],
   projects: [],
 };
@@ -1668,6 +1668,10 @@ export default function App() {
           <label className="field">
             Email
             <input value={profileDraft.contact?.email || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, contact: { ...(current.contact || {}), email: e.target.value } }))} />
+          </label>
+          <label className="field">
+            GitHub <span className="field-hint">(optional — shown in PDF only if filled)</span>
+            <input placeholder="github.com/username" value={profileDraft.contact?.github || ""} onChange={(e) => setProfileDraft((current) => ({ ...current, contact: { ...(current.contact || {}), github: e.target.value } }))} />
           </label>
         </div>
         <label className="field">

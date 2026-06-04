@@ -306,6 +306,20 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
 
     d = resume_data
 
+    # ── DOCUMENT METADATA ─────────────────────────────────────────────────
+    # The style template carries the original author's metadata (e.g. a Title
+    # of "Tharun_Manikonda_FSD" that PDF viewers show in the tab/title bar).
+    # Replace it with the current resume owner so nothing personal leaks.
+    owner = str(d.get('name', '')).strip() or 'Resume'
+    cp = doc.core_properties
+    cp.title = f"{owner} Resume"
+    cp.author = owner
+    cp.last_modified_by = owner
+    cp.subject = ""
+    cp.keywords = ""
+    cp.comments = ""
+    cp.category = ""
+
     # ── NAME ──────────────────────────────────────────────────────────────
     p_name = doc.add_paragraph(d['name'], style='Title')
     p_name.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -320,12 +334,15 @@ def build_resume_docx(resume_data: dict, output_docx: str, format_profile: str =
     p_contact.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_contact.paragraph_format.space_before = Pt(0)
     p_contact.paragraph_format.space_after  = Pt(3)
-    # Order: phone | email | github/location
-    contact_str = f"{c['phone']} | {c['email']}"
-    if c.get('github'):
-        contact_str += f" | {c['github']}"
-    elif c.get('location'):
-        contact_str += f" | {c['location']}"
+    # Order: location | phone | email | github. Each part is included only when
+    # it has a value, so GitHub appears only if the user added it.
+    contact_parts = [
+        str(c.get('location', '')).strip(),
+        str(c.get('phone', '')).strip(),
+        str(c.get('email', '')).strip(),
+        str(c.get('github', '')).strip(),
+    ]
+    contact_str = " | ".join(part for part in contact_parts if part)
     r = p_contact.add_run(contact_str)
     _format_run(r, size=profile["contact_size"], font_name=font_name)
 
