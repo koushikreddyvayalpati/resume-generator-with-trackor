@@ -4655,7 +4655,13 @@ def current_profile() -> dict:
         profile["name"] = saved_profile["name"]
 
     saved_contact = saved_profile.get("contact") or {}
+    # Non-empty saved values override the base (so we never clobber a real
+    # location/phone/email with a blank).
     profile["contact"].update({k: v for k, v in saved_contact.items() if v})
+    # GitHub is optional and edited only here, so reflect it verbatim — including
+    # an empty string — so clearing the field in the editor actually removes it.
+    if "github" in saved_contact:
+        profile["contact"]["github"] = str(saved_contact.get("github", "")).strip()
 
     # Projects and certifications come solely from the active profile
     # (profiles.json) so edits in the profile editor are reflected in the PDF.
